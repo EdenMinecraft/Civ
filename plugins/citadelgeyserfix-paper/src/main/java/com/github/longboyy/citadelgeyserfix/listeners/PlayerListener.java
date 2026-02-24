@@ -70,6 +70,10 @@ public class PlayerListener implements Listener {
         ExploitTracker.trackExploit(player, block);
         PositionTracker.teleportBack(player);
     }
+    @EventHandler()
+    public void onPlayerBreakDoor(){
+
+    }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerMove(PlayerMoveEvent event) {

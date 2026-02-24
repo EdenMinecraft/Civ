@@ -11,6 +11,7 @@ import com.github.maxopoly.finale.command.ShowCpsCommand;
 import com.github.maxopoly.finale.external.CombatTagPlusManager;
 import com.github.maxopoly.finale.external.FinaleSettingManager;
 import com.github.maxopoly.finale.listeners.BlockListener;
+import com.github.maxopoly.finale.listeners.CombatTagListener;
 import com.github.maxopoly.finale.listeners.CrossbowListener;
 import com.github.maxopoly.finale.listeners.DamageListener;
 import com.github.maxopoly.finale.listeners.EnchantmentDisableListener;
@@ -134,6 +135,10 @@ public class Finale extends ACivMod {
         }
         Bukkit.getPluginManager().registerEvents(new CrossbowListener(config.isFireworkExplosions()), this);
         Bukkit.getPluginManager().registerEvents(new GappleListener(), this);
+
+        if(ctpManager != null){
+            Bukkit.getPluginManager().registerEvents(new CombatTagListener(this), this);
+        }
     }
 
     public PearlCoolDownListener getPearlCoolDownListener() {

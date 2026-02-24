@@ -50,8 +50,13 @@ include(":plugins:kiragateway-velocity")
 include(":plugins:fortunedrops-paper")
 include(":plugins:civspy-api")
 include(":plugins:civspy-paper")
+
+// Eden additions
 include(":plugins:netherpearls-paper")
 include(":plugins:evenmorerewards-paper")
 include(":plugins:citadelgeyserfix-paper")
 include(":plugins:eve-paper")
 include(":plugins:repelshitters-paper")
+include(":plugins:creativeworlds-paper")
+include(":plugins:shortwave-paper")
+

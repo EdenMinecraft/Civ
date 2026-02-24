@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.programmerdan.minecraft.civspy.annotations.RequirePlugins;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.event.HandlerList;
@@ -188,6 +189,12 @@ public class CivSpy extends JavaPlugin {
                 Class<?> clazz = clsInfo.load();
                 getLogger().log(Level.INFO, "Found a class {0}, attempting to find a suitable constructor", clazz.getName());
                 if (clazz != null && DataListener.class.isAssignableFrom(clazz)) {
+
+                    if (!areDependenciesAvailable(clazz)) {
+                        getLogger().log(Level.INFO, "Class {0} skipped due to missing dependencies.", clazz.getName());
+                        continue;
+                    }
+
                     DataListener dataListener = null;
                     try {
                         Constructor<?> constructBasic = clazz.getConstructor(DataManager.class, Logger.class, String.class);
@@ -223,6 +230,22 @@ public class CivSpy extends JavaPlugin {
         } catch (IOException ioe) {
             getLogger().log(Level.WARNING, "Failed to load any listeners, due to IO error", ioe);
         }
+    }
+
+    private boolean areDependenciesAvailable(Class<?> clazz) {
+        // Check for @RequirePlugins annotation
+        RequirePlugins requirePlugins = clazz.getAnnotation(RequirePlugins.class);
+        if (requirePlugins != null) {
+            for (String pluginName : requirePlugins.value()) {
+                if (Bukkit.getPluginManager().getPlugin(pluginName) == null) {
+                    getLogger().log(Level.INFO, "Dependency {0} not found for listener {1}",
+                        new Object[]{pluginName, clazz.getName()});
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

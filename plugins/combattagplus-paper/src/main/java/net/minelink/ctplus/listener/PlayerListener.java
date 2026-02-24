@@ -6,6 +6,7 @@ import net.minelink.ctplus.CombatTagPlus;
 import net.minelink.ctplus.Tag;
 import net.minelink.ctplus.event.CombatLogEvent;
 import net.minelink.ctplus.event.PlayerCombatTagEvent;
+import net.minelink.ctplus.event.SafeLogoutEvent;
 import net.minelink.ctplus.task.SafeLogoutTask;
 import net.minelink.ctplus.task.TagUpdateTask;
 
@@ -72,7 +73,10 @@ public final class PlayerListener implements Listener {
         if (player.hasPermission("ctplus.bypass.tag")) return;
 
         // Do nothing if player has safely logged out
-        if (SafeLogoutTask.isFinished(player)) return;
+        if (SafeLogoutTask.isFinished(player)){
+            plugin.getServer().getPluginManager().callEvent(new SafeLogoutEvent(player));
+            return;
+        }
 
         plugin.getServer().getPluginManager().callEvent(
             new CombatLogEvent(

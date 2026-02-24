@@ -39,12 +39,20 @@ public class FinaleSettingManager {
     private DisplayLocationSetting coordsLocation;
     private IntegerSetting toolProtectionThreshhold;
 
+    // hidden settings
+    private BooleanSetting loggedOffUnsafe;
+
     public FinaleSettingManager() {
         initSettings();
     }
 
     public void initSettings() {
         Finale plugin = Finale.getPlugin();
+
+        loggedOffUnsafe = new BooleanSetting(plugin, false, "Logged off unsafe", "finaleUnsafeLog", "Did you log off unsafely?");
+        PlayerSettingAPI.registerSetting(loggedOffUnsafe, null);
+
+
         MenuSection menu = PlayerSettingAPI.getMainMenu().createMenuSection("Combat",
             "Combat and Finale related settings", new ItemStack(Material.DIAMOND_SWORD));
 
@@ -212,6 +220,14 @@ public class FinaleSettingManager {
 
     public boolean showPotionEffects(UUID uuid) {
         return showPotionEffects.getValue(uuid);
+    }
+
+    public void setUnsafeLogout(UUID uuid, boolean unsafe){
+        loggedOffUnsafe.setValue(uuid, unsafe);
+    }
+
+    public boolean getUnsafeLogout(UUID uuid){
+        return loggedOffUnsafe.getValue(uuid);
     }
 
 }

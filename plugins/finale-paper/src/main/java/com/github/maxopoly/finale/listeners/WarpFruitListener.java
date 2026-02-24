@@ -2,6 +2,8 @@ package com.github.maxopoly.finale.listeners;
 
 import com.github.maxopoly.finale.Finale;
 import com.github.maxopoly.finale.misc.warpfruit.WarpFruitTracker;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -73,6 +75,13 @@ public class WarpFruitListener implements Listener {
                         cancel();
                         return;
                     }
+                    if (player.isInsideVehicle()) {
+                        if (warpFruitTracker.isSpectralWhileChanneling() && player.hasPotionEffect(PotionEffectType.GLOWING)) {
+                            player.removePotionEffect(PotionEffectType.GLOWING);
+                        }
+                        cancel();
+                        return;
+                    }
                     if (warpFruitTracker.onCooldown(player)) {
                         if (warpFruitTracker.isSpectralWhileChanneling() && player.hasPotionEffect(PotionEffectType.GLOWING)) {
                             player.removePotionEffect(PotionEffectType.GLOWING);
@@ -94,7 +103,8 @@ public class WarpFruitListener implements Listener {
         WarpFruitTracker warpFruitTracker = Finale.getPlugin().getManager().getWarpFruitTracker();
         Player player = event.getPlayer();
         ItemStack itemStack = event.getItem();
-        if (itemStack.getType() == Material.CHORUS_FRUIT) {
+
+        if (itemStack.getType() == Material.CHORUS_FRUIT && !player.isInsideVehicle()) {
             if (warpFruitTracker.timewarp(player)) {
                 if (warpFruitTracker.isSpectralWhileChanneling() && player.hasPotionEffect(PotionEffectType.GLOWING)) {
                     player.removePotionEffect(PotionEffectType.GLOWING);

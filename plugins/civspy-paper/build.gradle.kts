@@ -12,6 +12,10 @@ dependencies {
     paperweight {
         paperDevBundle(libs.versions.paper)
     }
+
+    compileOnly(project(":plugins:bastion-paper"))
+    compileOnly(project(":plugins:civmodcore-paper"))
+    compileOnly(project(":plugins:citadel-paper"))
 }
 
 tasks {

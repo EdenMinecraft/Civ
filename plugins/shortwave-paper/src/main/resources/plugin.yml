@@ -1,0 +1,7 @@
+name: Shortwave
+version: ${version}
+main: com.github.longboyy.shortwave.ShortwavePlugin
+author: Longboyy
+description: Shortwave radio plugin
+api-version: 1.21
+depend: [CivModCore, Citadel, NameLayer]

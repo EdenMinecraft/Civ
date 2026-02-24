@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -80,6 +81,10 @@ public class CivChat2Manager {
 
     private final StarManager starManager;
 
+    // Load banned words once when CivChat2Manager is created
+    private final Set<String> bannedWords;
+    private final HashMap<String, Pattern> bannedWordPatterns;
+
     public CivChat2Manager(CivChat2 pluginInstance, ServerBroadcaster broadcaster, StarManager starManager) {
 
 
@@ -96,6 +101,7 @@ public class CivChat2Manager {
         afkPlayers = new HashMap<>();
         scoreboardHUD = new ScoreboardHUD();
         bannedWords = loadBannedWords();
+        bannedWordPatterns = loadBannedWordPatterns();
         muteTimeSeconds = config.getMuteTimeSeconds();
         banSetting = instance.getCivChat2SettingsManager().getGlobalChatMuteSetting();
         filterRelayGroup = config.getFilterRelayGroup();
@@ -414,10 +420,6 @@ public class CivChat2Manager {
         scoreboardHUD.updateScoreboardHUD(player);
     }
 
-
-    // Load banned words once when CivChat2Manager is created
-    private final Set<String> bannedWords;
-
     private Set<String> loadBannedWords() {
 
         Set<String> words = new HashSet<>();
@@ -438,10 +440,18 @@ public class CivChat2Manager {
         return words;
     }
 
+    private HashMap<String, Pattern> loadBannedWordPatterns(){
+        HashMap<String, Pattern> patterns = new HashMap<>();
+        for (String word : bannedWords) {
+            String pattern = "\\b" + Pattern.quote(word) + "\\b";
+            patterns.put(word, Pattern.compile(pattern, Pattern.CASE_INSENSITIVE));
+        }
+        return patterns;
+    }
+
     private boolean containsBannedWord(String message) {
-        String lowerMessage = message.toLowerCase();
-        for (String bannedWord : bannedWords) {
-            if (lowerMessage.contains(bannedWord)) {
+        for (Pattern pattern : bannedWordPatterns.values()) {
+            if (pattern.matcher(message).find()) {
                 return true;
             }
         }

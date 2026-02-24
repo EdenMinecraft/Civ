@@ -22,7 +22,7 @@ public class ExilePearListener implements Listener {
         }
         int streak = streakMan.getRecalculatedCurrentStreak(event.getPearl().getPlayerId());
         event.setDamageAmount(
-            Math.max(1, Math.round(event.getDamageAmount() * (1 + (streak * 0.25f))))
+            Math.max(1, Math.round(event.getDamageAmount() * (1 + (streak * 0.5f))))
         );
     }
 

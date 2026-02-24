@@ -2,8 +2,10 @@ package vg.civcraft.mc.citadel.listener;
 
 import com.destroystokyo.paper.MaterialTags;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.ChatColor;
@@ -219,10 +221,12 @@ public class BlockListener implements Listener {
         }
     }
 
+    private static final Set<Material> PREVENT_SPREAD_MATERIALS = Set.of(Material.GRASS_BLOCK, Material.SCULK_CATALYST);
+
     // prevent "enemy" grass spreading to reinforced dirt
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onGrassSpread(BlockSpreadEvent event) {
-        if (event.getSource().getType() != Material.GRASS_BLOCK) return;
+        if (!PREVENT_SPREAD_MATERIALS.contains(event.getSource().getType())) return;
 
         Reinforcement destRein = ReinforcementLogic.getReinforcementProtecting(event.getBlock());
         if (destRein == null) {

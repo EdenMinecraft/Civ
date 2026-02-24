@@ -1,0 +1,14 @@
+inactivityTime: 5m
+ghastBlocksPerSecond: 7.0
+ghastMaxHealth: 40.0
+citadel:
+  # How much we should scale damage by initially.
+  startingScalar: 4.0
+  # How old does a player have to be to not be affected by repel shitters
+  gameTimeThreshold: 12h
+  # How much weight should we give the game time
+  gameTimeWeighting: 0.5..
+  # How long ago did the player first join the server to not be affected by repel shitters
+  firstJoinThreshold: 48h
+  # How much weight should we give the first join time
+  firstJoinWeighting: 0.5

@@ -3,6 +3,7 @@ package com.github.longboyy.repelshitters;
 import com.github.longboyy.repelshitters.commands.ReloadCommand;
 import com.github.longboyy.repelshitters.listeners.CitadelListener;
 import com.github.longboyy.repelshitters.listeners.ExilePearlListener;
+import com.github.longboyy.repelshitters.listeners.MobListener;
 import com.github.longboyy.repelshitters.listeners.PlayerListener;
 import com.github.longboyy.repelshitters.listeners.GhastListener;
 import org.bukkit.event.HandlerList;
@@ -12,7 +13,7 @@ import java.util.Random;
 
 public class RepelShitters extends ACivMod{
 
-    private final Random random = new Random();
+    public static final Random RANDOM = new Random();
     private final RepelShittersConfig config;
     private final ActivityManager activityManager;
     private final AutoPotManager autoPotManager;
@@ -20,6 +21,7 @@ public class RepelShitters extends ACivMod{
     private final PlayerListener playerListener;
     private final CitadelListener citadelListener;
     private final GhastListener ghastListener;
+    private final MobListener mobListener;
     //private final ExilePearlListener exilePearlListener;
     private CommandManager commandManager;
 
@@ -31,6 +33,7 @@ public class RepelShitters extends ACivMod{
         this.playerListener = new PlayerListener(this);
         this.citadelListener = new CitadelListener(this);
         this.ghastListener = new GhastListener(this);
+        this.mobListener = new MobListener();
         //this.exilePearlListener = new ExilePearlListener(this);
     }
 
@@ -45,6 +48,7 @@ public class RepelShitters extends ACivMod{
         this.registerListener(this.playerListener);
         this.registerListener(this.citadelListener);
         this.registerListener(this.ghastListener);
+        this.registerListener(this.mobListener);
         //this.registerListener(this.exilePearlListener);
         this.commandManager = new CommandManager(this);
         this.commandManager.init();

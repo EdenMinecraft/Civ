@@ -177,6 +177,9 @@ public class GameFixes extends SimpleHack<GameFixesConfig> implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
+        if(event.getClickedBlock().getWorld().getEnvironment() == Environment.NETHER){
+            return;
+        }
         if (!event.getClickedBlock().getType().equals(Material.RESPAWN_ANCHOR)) {
             return;
         }
