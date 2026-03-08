@@ -93,6 +93,11 @@ commands:
     usage: /<command> <cap>
     permission: simpleadmin.setplayercap
   stats: { } # Defined in (basic) PlayerStats
+  wiki:
+    description: Opens a link to the EdenMC wiki.
+    usage: /wiki
+    permission: simpleadminhacks.wiki
+    permission-message: You don't have permission to use this command.
 permissions:
   simpleadmin.*:
     description: Gives access to all SimpleAdminHacks commands
@@ -162,3 +167,6 @@ permissions:
     simpleadmin.setplayercap:
       description: Gives the ability to set the player cap
       default: op
+    simpleadminhacks.wiki:
+      description: Allows use of /wiki
+      default: true

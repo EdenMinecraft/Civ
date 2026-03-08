@@ -582,3 +582,7 @@ hacks:
         weight: 1
         minAmount: 1
         maxAmount: 16
+  WikiHack:
+    enabled: true
+    url: "https://edenmc.miraheze.org/wiki/Main_Page"
+    linkText: "[EdenMC Wiki]"
