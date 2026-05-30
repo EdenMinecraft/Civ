@@ -271,7 +271,9 @@ public class GroupManager {
                 group.getName() + " and " + toMerge.getName());
             return;
         }
-        group.isValid();
+        if (!group.isValid()) {
+            return;
+        }
         group.setDisciplined(true, false);
         toMerge.setDisciplined(true, false);
 

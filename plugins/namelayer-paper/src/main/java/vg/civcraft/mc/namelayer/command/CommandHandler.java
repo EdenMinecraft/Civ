@@ -28,6 +28,7 @@ import vg.civcraft.mc.namelayer.command.commands.ListInvites;
 import vg.civcraft.mc.namelayer.command.commands.ListMembers;
 import vg.civcraft.mc.namelayer.command.commands.ListPermissions;
 import vg.civcraft.mc.namelayer.command.commands.ListPlayerTypes;
+import vg.civcraft.mc.namelayer.command.commands.MergeGroups;
 import vg.civcraft.mc.namelayer.command.commands.ModifyPermissions;
 import vg.civcraft.mc.namelayer.command.commands.NameLayerGroupGui;
 import vg.civcraft.mc.namelayer.command.commands.PromotePlayer;
@@ -66,7 +67,7 @@ public class CommandHandler extends CommandManager {
         registerCommand(new ListMembers());
         registerCommand(new ListInvites());
         registerCommand(new ListPermissions());
-        //addCommands(new MergeGroups("MergeGroups")); Disabled as it's currently semi broken
+        registerCommand(new MergeGroups());
         registerCommand(new ModifyPermissions());
         registerCommand(new RemoveMember());
         registerCommand(new SetPassword());
