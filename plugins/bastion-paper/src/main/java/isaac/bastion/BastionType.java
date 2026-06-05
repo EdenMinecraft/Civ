@@ -461,6 +461,24 @@ public class BastionType {
         return types.get(name);
     }
 
+    /**
+     * Finds the configured type whose block material is {@code material}, ignoring item name and
+     * lore. A placed world block carries neither, so the reconciler uses this to recover the type a
+     * block was meant to be. Returns the first match; a config with two types sharing a material is
+     * ambiguous and resolves to load order.
+     */
+    public static BastionType getByMaterial(Material material) {
+        if (material == null) {
+            return null;
+        }
+        for (BastionType type : types.values()) {
+            if (material.equals(type.getMaterial())) {
+                return type;
+            }
+        }
+        return null;
+    }
+
     public static BastionType getBastionType(Material mat, String itemName, List<String> lore) {
         if (lore != null && lore.size() == 0) lore = null;
         for (BastionType type : types.values()) {
