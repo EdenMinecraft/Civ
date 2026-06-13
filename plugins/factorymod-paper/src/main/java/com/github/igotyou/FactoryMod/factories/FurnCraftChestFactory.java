@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.github.igotyou.FactoryMod.utility.MultiInventoryWrapper;
 import org.bukkit.Bukkit;
@@ -57,6 +58,7 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
     protected int currentProductionTimer = 0;
     protected List<IRecipe> recipes;
     protected IRecipe currentRecipe;
+    private IRecipe preferredRecipe;
     protected Map<IRecipe, Integer> runCount;
     protected Map<IRecipe, Integer> recipeLevel;
     private UUID activator;
@@ -295,8 +297,10 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
                 }
             }
 
-            // If we run out of input materials, try to auto-select a new recipe
-            if (!hasInputMaterials()) {
+            // Re-select when out of materials, or when holding a repair recipe on a
+            // factory that isn't broken (auto mode must never repair a healthy factory)
+            boolean healthyButRepairing = currentRecipe instanceof RepairRecipe && !rm.inDisrepair();
+            if (!hasInputMaterials() || healthyButRepairing) {
                 IRecipe autoSelected = getAutoSelectRecipe();
                 if (autoSelected == null) {
                     if (p != null) {
@@ -669,6 +673,26 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
         }
     }
 
+    /**
+     * Sets the recipe in response to an explicit player selection, recording it as
+     * the preferred recipe so auto mode returns to it after any automatic detour
+     * (e.g. a repair). One-off manual repairs don't become the preference.
+     */
+    public void setRecipeManually(IRecipe pr) {
+        setRecipe(pr);
+        if (currentRecipe == pr && !(pr instanceof RepairRecipe)) {
+            preferredRecipe = pr;
+        }
+    }
+
+    public IRecipe getPreferredRecipe() {
+        return preferredRecipe;
+    }
+
+    public void setPreferredRecipe(IRecipe pr) {
+        preferredRecipe = pr;
+    }
+
     public void setRecipeForce(IRecipe pr) {
         currentRecipe = pr;
     }
@@ -736,24 +760,36 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      * @return null if no suitable recipe was found
      */
     public IRecipe getAutoSelectRecipe() {
-        var selectedRecipe = recipes.stream()
-            .filter(it -> {
-                // We want to select a repair recipe if and only if the factory is in disrepair
-                if (rm.inDisrepair()) {
-                    return it instanceof RepairRecipe;
-                } else {
-                    return !(it instanceof RepairRecipe);
-                }
-            })
-            .filter(it -> it.enoughMaterialAvailable(getInputInventory()))
-            .findFirst()
-            .orElse(null);
+        IRecipe selectedRecipe = chooseAutoRecipe(recipes, rm.inDisrepair(), preferredRecipe,
+            it -> it instanceof RepairRecipe,
+            it -> it.enoughMaterialAvailable(getInputInventory()));
 
         if (selectedRecipe != null) {
             LoggingUtils.log("Auto-selected recipe " + selectedRecipe.getName());
         }
 
         return selectedRecipe;
+    }
+
+    /**
+     * Picks the recipe auto mode should run. A recipe is eligible only when its
+     * repair-ness matches the factory state: repair recipes when in disrepair,
+     * production recipes otherwise. Among eligible recipes the player's preferred
+     * one wins when it's still runnable, otherwise the first eligible recipe with
+     * enough materials is used. Pure so it can be unit tested without a live factory.
+     */
+    static IRecipe chooseAutoRecipe(List<IRecipe> recipes, boolean inDisrepair, IRecipe preferred,
+                                    Predicate<IRecipe> isRepair, Predicate<IRecipe> hasMaterials) {
+        Predicate<IRecipe> eligible = it -> inDisrepair == isRepair.test(it);
+        if (!inDisrepair && preferred != null && eligible.test(preferred)
+            && recipes.contains(preferred) && hasMaterials.test(preferred)) {
+            return preferred;
+        }
+        return recipes.stream()
+            .filter(eligible)
+            .filter(hasMaterials)
+            .findFirst()
+            .orElse(null);
     }
 
     /**
