@@ -57,6 +57,8 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
     protected int currentProductionTimer = 0;
     protected List<IRecipe> recipes;
     protected IRecipe currentRecipe;
+    private IRecipe preferredRecipe;
+    private boolean automaticRepairInProgress;
     protected Map<IRecipe, Integer> runCount;
     protected Map<IRecipe, Integer> recipeLevel;
     private UUID activator;
@@ -249,6 +251,9 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      */
     public void setAutoSelect(boolean mode) {
         this.autoSelect = mode;
+        if (!mode) {
+            automaticRepairInProgress = false;
+        }
     }
 
     /**
@@ -264,6 +269,14 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      */
     @Override
     public void attemptToActivate(Player p, boolean onStartUp) {
+        attemptToActivate(p, onStartUp, 0);
+    }
+
+    public void resume(int productionTimer) {
+        attemptToActivate(null, true, productionTimer);
+    }
+
+    private void attemptToActivate(Player p, boolean onStartUp, int productionTimer) {
         LoggingUtils.debug((p != null ? p.getName() : "Redstone") + " is attempting to activate " + getLogData());
         mbs.recheckComplete();
         //dont activate twice
@@ -276,38 +289,23 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
             return;
         }
 
-        //If Autoselect is on
+        IRecipe recipeBeforeActivation = currentRecipe;
         if (autoSelect) {
-            //If the factory is in disrepair and we got autoSelect on, we want to repair it
-            if (rm.inDisrepair() && !(currentRecipe instanceof RepairRecipe)) {
-                IRecipe autoRepair = getRepairRecipe();
-                //Just incase any factory for some reason cannot be repaired.
-                if (autoRepair == null) {
-                    if (p != null) {
-                        p.sendMessage(ChatColor.RED + "The factory doesn't have a repair recipe.");
-                    }
-                    return;
-                } else {
-                    if (p != null) {
-                        p.sendMessage(ChatColor.GOLD + "Automatically selected recipe " + autoRepair.getName());
-                    }
-                    setRecipe(autoRepair);
-                }
+            if (rm.atFullHealth()) {
+                automaticRepairInProgress = false;
             }
-
-            // If we run out of input materials, try to auto-select a new recipe
-            if (!hasInputMaterials()) {
+            if (currentRecipe == null || (currentRecipe instanceof RepairRecipe) != needsAutomaticRepair()
+                || !hasInputMaterials()) {
                 IRecipe autoSelected = getAutoSelectRecipe();
                 if (autoSelected == null) {
                     if (p != null) {
                         p.sendMessage(ChatColor.RED + "Not enough materials available to run any recipe");
                     }
                     return;
-                } else {
-                    if (p != null) {
-                        p.sendMessage(ChatColor.GOLD + "Automatically selected recipe " + autoSelected.getName());
-                    }
-                    setRecipe(autoSelected);
+                }
+                setRecipe(autoSelected);
+                if (p != null) {
+                    p.sendMessage(ChatColor.GOLD + "Automatically selected recipe " + autoSelected.getName());
                 }
             }
         } else {
@@ -334,52 +332,7 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
             }
         }
 
-        //ensure we have fuel
-        if (!pm.powerAvailable(1)) {
-            if (p != null) {
-                ItemStack fuel = ((FurnacePowerManager) pm).getFuel().clone();
-                if (fuel != null) {
-                    p.sendMessage(ChatColor.RED + "Failed to activate factory, there is no fuel (" + ItemUtils.getItemName(fuel) + ") in the furnace");
-                } else {
-                    p.sendMessage(ChatColor.RED + "Failed to activate factory, there is no fuel in the furnace");
-                }
-            }
-            return;
-        }
-
-        // Ensure the recipe effect can be applied
-        var effectFeasibility = currentRecipe.evaluateEffectFeasibility(getInputInventory(), getOutputInventory());
-        if (!(effectFeasibility.isFeasible())) {
-            LoggingUtils.log(String.format("Skipping activation of recipe [%s], since the effect wasn't feasible.", currentRecipe.getName()));
-            if (p != null) {
-                p.sendMessage(String.format("%sUnable to activate recipe because %s.", ChatColor.RED, effectFeasibility.reasonSnippet()));
-            }
-            return;
-        }
-
-        // Check that there is an output selected at all
-        if (furnaceIoSelector.getOutputCount() == 0 && tableIoSelector.getOutputCount() == 0) {
-            p.sendMessage(String.format("%sFailed to activate factory, it has no IO Outputs configured", ChatColor.RED));
-            return;
-        }
-
-        if (!onStartUp && currentRecipe instanceof Upgraderecipe && FactoryMod.getInstance().getManager().isCitadelEnabled()) {
-            // only allow permitted members to upgrade the factory
-            Reinforcement rein = ReinforcementLogic.getReinforcementAt(mbs.getCenter());
-            if (rein != null) {
-                if (p == null) {
-                    return;
-                }
-                if (!NameLayerAPI.getGroupManager().hasAccess(rein.getGroup().getName(), p.getUniqueId(),
-                    PermissionType.getPermission("UPGRADE_FACTORY"))) {
-                    p.sendMessage(ChatColor.RED + "You dont have permission to upgrade this factory");
-                    return;
-                }
-            }
-        }
-        FactoryActivateEvent fae = new FactoryActivateEvent(this, p);
-        Bukkit.getPluginManager().callEvent(fae);
-        if (fae.isCancelled()) {
+        if (!canActivateRecipe(p, onStartUp && currentRecipe == recipeBeforeActivation)) {
             return;
         }
         if (p != null) {
@@ -394,7 +347,64 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
             p.sendMessage(ChatColor.GREEN + "Activated " + name + " with recipe: " + currentRecipe.getName());
             activator = p.getUniqueId();
         }
-        activate();
+        if (autoSelect && currentRecipe instanceof RepairRecipe) {
+            automaticRepairInProgress = true;
+        }
+        activate(onStartUp && currentRecipe == recipeBeforeActivation ? productionTimer : 0);
+    }
+
+    private boolean canActivateRecipe(Player p, boolean onStartUp) {
+        //ensure we have fuel
+        if (!pm.powerAvailable(1)) {
+            if (p != null) {
+                ItemStack fuel = ((FurnacePowerManager) pm).getFuel();
+                if (fuel != null) {
+                    p.sendMessage(ChatColor.RED + "Failed to activate factory, there is no fuel (" + ItemUtils.getItemName(fuel) + ") in the furnace");
+                } else {
+                    p.sendMessage(ChatColor.RED + "Failed to activate factory, there is no fuel in the furnace");
+                }
+            }
+            return false;
+        }
+
+        // Ensure the recipe effect can be applied
+        var effectFeasibility = currentRecipe.evaluateEffectFeasibility(getInputInventory(), getOutputInventory());
+        if (!(effectFeasibility.isFeasible())) {
+            LoggingUtils.log(String.format("Skipping activation of recipe [%s], since the effect wasn't feasible.", currentRecipe.getName()));
+            if (p != null) {
+                p.sendMessage(String.format("%sUnable to activate recipe because %s.", ChatColor.RED, effectFeasibility.reasonSnippet()));
+            }
+            return false;
+        }
+
+        // Check that there is an output selected at all
+        if (getFurnaceIOSelector().getOutputCount() == 0 && getTableIOSelector().getOutputCount() == 0) {
+            if (p != null) {
+                p.sendMessage(String.format("%sFailed to activate factory, it has no IO Outputs configured", ChatColor.RED));
+            }
+            return false;
+        }
+
+        if (!onStartUp && currentRecipe instanceof Upgraderecipe && FactoryMod.getInstance().getManager().isCitadelEnabled()) {
+            // only allow permitted members to upgrade the factory
+            Reinforcement rein = ReinforcementLogic.getReinforcementAt(mbs.getCenter());
+            if (rein != null) {
+                if (p == null) {
+                    return false;
+                }
+                if (!NameLayerAPI.getGroupManager().hasAccess(rein.getGroup().getName(), p.getUniqueId(),
+                    PermissionType.getPermission("UPGRADE_FACTORY"))) {
+                    p.sendMessage(ChatColor.RED + "You dont have permission to upgrade this factory");
+                    return false;
+                }
+            }
+        }
+        FactoryActivateEvent fae = new FactoryActivateEvent(this, p);
+        Bukkit.getPluginManager().callEvent(fae);
+        if (fae.isCancelled()) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -404,13 +414,16 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      */
     @Override
     public void activate() {
+        activate(0);
+    }
+
+    private void activate(int productionTimer) {
         LoggingUtils.log("Activating " + getLogData() + ", because of " + (activator != null ?
             Bukkit.getPlayer(activator) : "Redstone"));
         active = true;
         pm.setPowerCounter(0);
         turnFurnaceOn(getFurnace());
-        // reset the production timer
-        currentProductionTimer = 0;
+        currentProductionTimer = Math.max(0, productionTimer);
         run();
     }
 
@@ -488,6 +501,10 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
     @Override
     public void run() {
         if (active && mbs.isComplete()) {
+            if (autoSelect && (currentRecipe instanceof RepairRecipe) != needsAutomaticRepair()) {
+                switchAutomaticRecipe();
+                return;
+            }
             // if the materials required to produce the current recipe are in
             // the factory inventory
             if (hasInputMaterials()) {
@@ -592,20 +609,21 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
                     if (currentRecipe instanceof RepairRecipe && rm.atFullHealth()) {
                         // already at full health, dont try to repair further
                         sendActivatorMessage(ChatColor.GOLD + name + " repaired to full health");
-                        deactivate();
+                        if (autoSelect && automaticRepairInProgress) {
+                            automaticRepairInProgress = false;
+                            pm.setPowerCounter(0);
+                            switchAutomaticRecipe();
+                        } else {
+                            deactivate();
+                        }
                         return;
                     }
                     if (pm.powerAvailable(1)) {
                         //not enough materials, but if auto select is on, we might find another recipe to run
                         if (!hasInputMaterials() && isAutoSelect()) {
-                            IRecipe nextOne = getAutoSelectRecipe();
-                            if (nextOne != null) {
-                                sendActivatorMessage(ChatColor.GREEN + name + " automatically switched to recipe " + nextOne.getName() + " and began running it");
-                                currentRecipe = nextOne;
-                            } else {
-                                deactivate();
-                                return;
-                            }
+                            pm.setPowerCounter(0);
+                            switchAutomaticRecipe();
+                            return;
                         }
                         pm.setPowerCounter(0);
                         scheduleUpdate();
@@ -615,12 +633,8 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
                     }
                 }
             } else {
-                IRecipe nextOne;
-                if (isAutoSelect() && (nextOne = getAutoSelectRecipe()) != null) {
-                    sendActivatorMessage(ChatColor.GREEN + name + " automatically switched to recipe " + nextOne.getName() + " and began running it");
-                    currentRecipe = nextOne;
-                    scheduleUpdate();
-                    // don't setPowerCounter to 0, fuel has been consumed, let it be used for the new recipe
+                if (isAutoSelect()) {
+                    switchAutomaticRecipe();
                 } else {
                     sendActivatorMessage(ChatColor.GOLD + name + " deactivated, because it ran out of required materials");
                     deactivate();
@@ -630,6 +644,27 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
             sendActivatorMessage(ChatColor.GOLD + name + " deactivated, because the factory was destroyed");
             deactivate();
         }
+    }
+
+    private void switchAutomaticRecipe() {
+        if (rm.atFullHealth()) {
+            automaticRepairInProgress = false;
+        }
+        IRecipe next = getAutoSelectRecipe();
+        if (next == null) {
+            sendActivatorMessage(ChatColor.GOLD + name + " deactivated, because it ran out of required materials");
+            deactivate();
+            return;
+        }
+        setRecipe(next);
+        Player player = activator == null ? null : Bukkit.getPlayer(activator);
+        if (!canActivateRecipe(player, false)) {
+            deactivate();
+            return;
+        }
+        automaticRepairInProgress = next instanceof RepairRecipe;
+        sendActivatorMessage(ChatColor.GREEN + name + " automatically switched to recipe " + next.getName() + " and began running it");
+        scheduleUpdate();
     }
 
     /**
@@ -665,12 +700,51 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      */
     public void setRecipe(IRecipe pr) {
         if (recipes.contains(pr)) {
-            currentRecipe = pr;
+            changeRecipe(pr);
         }
     }
 
+    public void setRecipeManually(IRecipe pr) {
+        if (recipes.contains(pr)) {
+            setRecipe(pr);
+            automaticRepairInProgress = false;
+            if (!(pr instanceof RepairRecipe)) {
+                preferredRecipe = pr;
+            }
+        }
+    }
+
+    public IRecipe getPreferredRecipe() {
+        return preferredRecipe;
+    }
+
+    public void setPreferredRecipe(IRecipe pr) {
+        preferredRecipe = recipes.contains(pr) && !(pr instanceof RepairRecipe) ? pr : null;
+    }
+
+    public boolean isAutomaticRepairInProgress() {
+        return automaticRepairInProgress;
+    }
+
+    public void restoreAutomaticRepair(boolean inProgress) {
+        automaticRepairInProgress = inProgress && autoSelect && currentRecipe instanceof RepairRecipe
+            && !rm.atFullHealth();
+    }
+
+    private boolean needsAutomaticRepair() {
+        return rm.inDisrepair() || (automaticRepairInProgress && !rm.atFullHealth());
+    }
+
     public void setRecipeForce(IRecipe pr) {
-        currentRecipe = pr;
+        automaticRepairInProgress = false;
+        changeRecipe(pr);
+    }
+
+    private void changeRecipe(IRecipe recipe) {
+        if (currentRecipe != recipe) {
+            currentProductionTimer = 0;
+            currentRecipe = recipe;
+        }
     }
 
     public int getRunCount(IRecipe r) {
@@ -711,6 +785,9 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
         recipes.remove(rec);
         runCount.remove(rec);
         recipeLevel.remove(rec);
+        if (preferredRecipe == rec) {
+            preferredRecipe = null;
+        }
     }
 
     /**
@@ -727,7 +804,7 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      * selected recipe at least once
      */
     public boolean hasInputMaterials() {
-        return currentRecipe.enoughMaterialAvailable(getInputInventory());
+        return currentRecipe != null && currentRecipe.enoughMaterialAvailable(getInputInventory());
     }
 
     /**
@@ -736,23 +813,21 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
      * @return null if no suitable recipe was found
      */
     public IRecipe getAutoSelectRecipe() {
-        var selectedRecipe = recipes.stream()
-            .filter(it -> {
-                // We want to select a repair recipe if and only if the factory is in disrepair
-                if (rm.inDisrepair()) {
-                    return it instanceof RepairRecipe;
-                } else {
-                    return !(it instanceof RepairRecipe);
-                }
-            })
-            .filter(it -> it.enoughMaterialAvailable(getInputInventory()))
-            .findFirst()
-            .orElse(null);
-
+        boolean repairRequired = needsAutomaticRepair();
+        Inventory input = getInputInventory();
+        IRecipe selectedRecipe;
+        if (!repairRequired && preferredRecipe != null && recipes.contains(preferredRecipe)
+            && preferredRecipe.enoughMaterialAvailable(input)) {
+            selectedRecipe = preferredRecipe;
+        } else {
+            selectedRecipe = recipes.stream()
+                .filter(recipe -> (recipe instanceof RepairRecipe) == repairRequired)
+                .filter(recipe -> recipe.enoughMaterialAvailable(input))
+                .findFirst().orElse(null);
+        }
         if (selectedRecipe != null) {
             LoggingUtils.log("Auto-selected recipe " + selectedRecipe.getName());
         }
-
         return selectedRecipe;
     }
 
@@ -780,6 +855,8 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
         deactivate();
         this.name = name;
         this.recipes = recipes;
+        this.preferredRecipe = null;
+        this.automaticRepairInProgress = false;
         this.updateTime = updateTime;
         this.citadelBreakReduction = citadelBreakReduction;
         this.pm = new FurnacePowerManager(getFurnace(), fuel, fuelConsumptionIntervall);

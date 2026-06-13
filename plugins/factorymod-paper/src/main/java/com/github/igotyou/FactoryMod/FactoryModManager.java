@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -463,7 +465,18 @@ public class FactoryModManager {
 
     public void saveFactories() {
         plugin.info("Attempting to save factory data");
-        fileHandler.save(getAllFactories());
+        try {
+            FileHandler.SaveSnapshot snapshot = Bukkit.isPrimaryThread()
+                ? fileHandler.snapshot(getAllFactories())
+                : Bukkit.getScheduler().callSyncMethod(plugin, () -> fileHandler.snapshot(getAllFactories())).get();
+            fileHandler.save(snapshot);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            plugin.warning("Interrupted while capturing factory data");
+        } catch (ExecutionException | RuntimeException e) {
+            plugin.severe("Failed to capture factory data");
+            e.printStackTrace();
+        }
     }
 
     public void loadFactories() {
