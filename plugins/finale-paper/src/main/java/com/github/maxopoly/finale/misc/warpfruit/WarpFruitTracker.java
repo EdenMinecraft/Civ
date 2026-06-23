@@ -114,6 +114,11 @@ public class WarpFruitTracker {
         warpFruitData.logLocation(player.getLocation());
     }
 
+    public void logLocation(Player player, Location location) {
+        WarpFruitData warpFruitData = getWarpFruitData(player);
+        warpFruitData.logLocation(location);
+    }
+
     private void ring(Player player, Location location) {
         ParticleAudience audience = getParticleAudience(player);
 

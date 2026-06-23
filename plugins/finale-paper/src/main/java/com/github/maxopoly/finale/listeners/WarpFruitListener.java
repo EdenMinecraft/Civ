@@ -5,7 +5,9 @@ import com.github.maxopoly.finale.misc.warpfruit.WarpFruitTracker;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Material;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -13,6 +15,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -31,6 +34,27 @@ public class WarpFruitListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         WarpFruitTracker warpFruitTracker = Finale.getPlugin().getManager().getWarpFruitTracker();
         warpFruitTracker.logLocation(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onVehicleMove(VehicleMoveEvent event) {
+        if(event.getVehicle().getPassengers().isEmpty()){
+           return;
+        }
+
+        WarpFruitTracker warpFruitTracker = Finale.getPlugin().getManager().getWarpFruitTracker();
+        Vehicle vehicle = event.getVehicle();
+        vehicle.getPassengers().forEach(passenger -> {
+            if (!(passenger instanceof Player player)) {
+                return;
+            }
+
+            if(!player.isOnline()){
+                return;
+            }
+
+            warpFruitTracker.logLocation(player, player.getLocation().add(0, 1, 0));
+        });
     }
 
     private boolean isChorusHolder(Player player) {
@@ -104,7 +128,12 @@ public class WarpFruitListener implements Listener {
         Player player = event.getPlayer();
         ItemStack itemStack = event.getItem();
 
-        if (itemStack.getType() == Material.CHORUS_FRUIT && !player.isInsideVehicle()) {
+        if (itemStack.getType() == Material.CHORUS_FRUIT) {
+            if(player.isInsideVehicle()){
+                event.setCancelled(true);
+                return;
+            }
+
             if (warpFruitTracker.timewarp(player)) {
                 if (warpFruitTracker.isSpectralWhileChanneling() && player.hasPotionEffect(PotionEffectType.GLOWING)) {
                     player.removePotionEffect(PotionEffectType.GLOWING);
