@@ -22,6 +22,7 @@ public class PearlDecayEvent extends Event implements Cancellable {
     private boolean cancelled;
     private ExilePearl pearl;
     private int amount;
+    private final boolean preview;
 
     /**
      * Creates a new PearlDecayEvent instance.
@@ -30,9 +31,30 @@ public class PearlDecayEvent extends Event implements Cancellable {
      * @param amount Health amount the pearl health is reduced by
      */
     public PearlDecayEvent(ExilePearl pearl, int amount) {
+        this(pearl, amount, false);
+    }
+
+    /**
+     * Creates a new PearlDecayEvent instance.
+     *
+     * @param pearl   Pearl to decay
+     * @param amount  Health amount the pearl health is reduced by
+     * @param preview true when fired only to compute the effective decay amount (e.g. for lore),
+     *                without any health actually being removed. Listeners that apply side effects
+     *                (logging, metrics) should skip preview events; modifiers may still adjust the amount.
+     */
+    public PearlDecayEvent(ExilePearl pearl, int amount, boolean preview) {
         Preconditions.checkNotNull(pearl, "pearl");
         this.pearl = pearl;
         this.amount = amount;
+        this.preview = preview;
+    }
+
+    /**
+     * @return true when this event is a dry-run to compute the effective decay amount, not a real decay
+     */
+    public boolean isPreview() {
+        return preview;
     }
 
     /**
