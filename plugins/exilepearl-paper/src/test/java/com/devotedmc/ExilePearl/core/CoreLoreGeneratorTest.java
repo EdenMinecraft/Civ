@@ -4,11 +4,12 @@ import com.devotedmc.ExilePearl.ExilePearl;
 import com.devotedmc.ExilePearl.ExilePearlApi;
 import com.devotedmc.ExilePearl.ExilePearlPlugin;
 import com.devotedmc.ExilePearl.PearlType;
-import com.devotedmc.ExilePearl.RepairMaterial;
 import com.devotedmc.ExilePearl.config.PearlConfig;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.PluginManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,7 @@ class CoreLoreGeneratorTest {
     private ExilePearl pearl;
     private CoreLoreGenerator generator;
     private MockedStatic<ExilePearlPlugin> pluginStatic;
+    private MockedStatic<Bukkit> bukkitStatic;
 
     @BeforeEach
     void setUp() {
@@ -52,12 +54,17 @@ class CoreLoreGeneratorTest {
         pluginStatic = Mockito.mockStatic(ExilePearlPlugin.class);
         pluginStatic.when(ExilePearlPlugin::getApi).thenReturn(api);
 
+        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        bukkitStatic = Mockito.mockStatic(Bukkit.class);
+        bukkitStatic.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+
         generator = new CoreLoreGenerator(config, null);
     }
 
     @AfterEach
     void tearDown() {
         pluginStatic.close();
+        bukkitStatic.close();
     }
 
     @Test
@@ -66,7 +73,7 @@ class CoreLoreGeneratorTest {
         String timeRemaining = findLine(lore, "Time remaining:");
         Assertions.assertNotNull(timeRemaining, "Expected a 'Time remaining' line, got: " + lore);
         Assertions.assertTrue(timeRemaining.contains("10"), "Expected 10 days for health=240 / 24-per-day, got: " + timeRemaining);
-        Assertions.assertTrue(timeRemaining.contains("day"), "Expected unit 'day' in: " + timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("Days"), "Expected unit 'Days' in: " + timeRemaining);
     }
 
     @Test
@@ -92,21 +99,33 @@ class CoreLoreGeneratorTest {
     }
 
     @Test
-    void generateLore_timeRemainingRoundsUpForPartialInterval() {
-        Mockito.when(pearl.getHealth()).thenReturn(241); // 24*10 + 1
+    void generateLore_timeRemainingForPartialInterval() {
+        // 241 health at 24/day = 241 hours = ~10.04 days, which Math.round keeps as 10
+        Mockito.when(pearl.getHealth()).thenReturn(241);
         List<String> lore = generator.generateLore(pearl);
         String timeRemaining = findLine(lore, "Time remaining:");
         Assertions.assertNotNull(timeRemaining);
-        Assertions.assertTrue(timeRemaining.contains("11"), "241 health at 24/day should round up to 11 days, got: " + timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("10"), "241 health at 24/day should show 10 days, got: " + timeRemaining);
     }
 
     @Test
-    void generateLore_timeRemainingUsesConfiguredUnit() {
-        Mockito.when(config.getPearlHealthDecayHumanInterval()).thenReturn("week");
+    void generateLore_timeRemainingUsesDaysWhenOver24Hours() {
+        // With 240 health and 24/day decay, time remaining should be in Days
         List<String> lore = generator.generateLore(pearl);
         String timeRemaining = findLine(lore, "Time remaining:");
         Assertions.assertNotNull(timeRemaining);
-        Assertions.assertTrue(timeRemaining.contains("week"), "Configured unit 'week' should be used, got: " + timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("Days"), "Expected 'Days' unit for > 24 hours remaining, got: " + timeRemaining);
+    }
+
+    @Test
+    void generateLore_timeRemainingUsesHoursWhenUnder24Hours() {
+        // 12 health at 24/day = 12 hours remaining
+        Mockito.when(pearl.getHealth()).thenReturn(12);
+        List<String> lore = generator.generateLore(pearl);
+        String timeRemaining = findLine(lore, "Time remaining:");
+        Assertions.assertNotNull(timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("Hours"), "Expected 'Hours' unit for < 24 hours remaining, got: " + timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("12"), "Expected 12 hours, got: " + timeRemaining);
     }
 
     @Test
@@ -119,15 +138,14 @@ class CoreLoreGeneratorTest {
     }
 
     @Test
-    void generateLore_doesNotMutateConfiguredUnitForRepairLine() {
-        Mockito.when(config.getPearlHealthDecayHumanInterval()).thenReturn("day");
-        Mockito.when(pearl.getHealth()).thenReturn(24); // 1 interval
+    void generateLore_timeRemainingDoesNotAppendPluralS() {
+        // Regression guard: implementation uses hardcoded "Days"/"Hours", not a pluralized config unit
+        Mockito.when(pearl.getHealth()).thenReturn(24); // 1 day
         List<String> lore = generator.generateLore(pearl);
         String timeRemaining = findLine(lore, "Time remaining:");
         Assertions.assertNotNull(timeRemaining);
-        // Regression guard: no English-plural "s" injected, matches existing repair-line style
-        Assertions.assertFalse(timeRemaining.contains("days"),
-            "Lore must not append plural 's' to configured unit; got: " + timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("1"), "Expected 1 day remaining, got: " + timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("Days"), "Expected 'Days' unit, got: " + timeRemaining);
     }
 
     private static String findLine(List<String> lore, String marker) {

@@ -7,15 +7,18 @@ import com.devotedmc.ExilePearl.PearlType;
 import com.devotedmc.ExilePearl.RepairMaterial;
 import com.devotedmc.ExilePearl.command.CmdExilePearl;
 import com.devotedmc.ExilePearl.config.PearlConfig;
+import com.devotedmc.ExilePearl.event.PearlDecayEvent;
 import com.devotedmc.ExilePearl.holder.PearlHolder;
 import com.google.common.base.Preconditions;
 import com.programmerdan.minecraft.banstick.handler.BanHandler;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -36,6 +39,11 @@ final class CoreLoreGenerator implements LoreProvider {
     // These need to match!
     private static String PlayerNameStringFormat = "<a>Player: <n>%s <gray>#%s";
     private static String PlayerNameStringFormatRegex = "<a>Player: <n>.+ <gray>#(.+)";
+
+    private static String HealthStringFormat = "<a>Health: <n>%s/%s";
+    private static String TimeRemainingString = "<a>Time remaining: <n>%s %s";
+
+    private static DecimalFormat TIMER_FORMAT = new DecimalFormat("#.#");
 
     private final PearlConfig config;
     private final SimpleDateFormat dateFormat;
@@ -83,16 +91,39 @@ final class CoreLoreGenerator implements LoreProvider {
 
         lore.add(parse(""));
 
-        lore.add(parse("<a>Health: <n>%s/%s", health, config.getPearlHealthMaxValue()));
-        String unit = config.getPearlHealthDecayHumanInterval();
+        lore.add(parse(HealthStringFormat, health, config.getPearlHealthMaxValue()));
+
+        // Run the pearl decay event so we can figure out what the real damage amount is.
+        PearlDecayEvent pearlDecayEvent = new PearlDecayEvent(pearl, config.getPearlHealthDecayAmount());
+        Bukkit.getPluginManager().callEvent(pearlDecayEvent);
+        int damageAmount = pearlDecayEvent.getDamageAmount();
+        if(pearlDecayEvent.isCancelled()){
+            damageAmount = config.getPearlHealthDecayAmount();
+
+        }
+
+        double intervalsPerHour = 60D / config.getPearlHealthDecayIntervalMin();
+        double decayPerHour = damageAmount * intervalsPerHour;
+
+        if (decayPerHour > 0 && pearl.isActive()) {
+            int timeLeftHours = Math.toIntExact(Math.round(pearl.getHealth() / decayPerHour));
+
+            // if the time is >= 24 then more than a day is left.
+            double timeRemaining = timeLeftHours >= 24 ? timeLeftHours / 24D : timeLeftHours;
+            String timeRemainingUnit = timeLeftHours >= 24 ? "Days" : "Hours";
+
+            if (timeRemaining > 0f) {
+                lore.add(parse(TimeRemainingString, TIMER_FORMAT.format(timeRemaining), timeRemainingUnit));
+            }
+        }
+
         int decayPerHumanInterval = PearlDecayMath.decayPerHumanInterval(
             config.getPearlHealthDecayHumanIntervalMin(),
             config.getPearlHealthDecayIntervalMin(),
-            config.getPearlHealthDecayAmount());
-        int intervalsRemaining = PearlDecayMath.intervalsRemaining(health, decayPerHumanInterval);
-        if (intervalsRemaining > 0 && pearl.isActive()) {
-            lore.add(parse("<a>Time remaining: <n>%d %s", intervalsRemaining, unit));
-        }
+            damageAmount);
+
+        // The unit defined should only be used for displaying cost per interval, as it isn't an accurate representation of the time remaining.
+        String unit = config.getPearlHealthDecayHumanInterval();
         Set<RepairMaterial> repair = config.getRepairMaterials(pearl.getPearlType());
         if (repair != null) {
             for (RepairMaterial rep : repair) {
