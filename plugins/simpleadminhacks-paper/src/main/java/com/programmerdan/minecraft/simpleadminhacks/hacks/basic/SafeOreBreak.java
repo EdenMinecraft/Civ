@@ -15,6 +15,7 @@ import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -73,7 +74,7 @@ public final class SafeOreBreak extends BasicHack {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onOreBreak(BlockBreakEvent event) {
+    public void onOreClick(BlockDamageEvent event) {
         if (event.getPlayer().getGameMode() != GameMode.SURVIVAL) {
             return;
         }

@@ -152,6 +152,47 @@ public class PrintBookRecipe extends PrintingPressRecipe {
     }
 
     @Override
+    public List<String> getTextualInputRepresentation(Inventory i, FurnCraftChestFactory fccf) {
+        List<String> result = super.getTextualInputRepresentation(i, fccf);
+        result.add("1 Printing Plate");
+        return result;
+    }
+
+    @Override
+    public ItemStack getRecipeRepresentation(Inventory inputInv) {
+        ItemStack res = super.getRecipeRepresentation(inputInv);
+        if (inputInv == null) {
+            return res;
+        }
+        int have = getPrintingPlateItemStack(inputInv, this.printingPlate) != null ? 1 : 0;
+        int needed = 1;
+        ChatColor color = have >= needed ? ChatColor.GREEN : ChatColor.RED;
+        String plain = ChatColor.GRAY + " - " + ChatColor.AQUA + "1 Printing Plate";
+        String repl = ChatColor.GRAY + " - " + color + have + "/" + needed + " " + PrintingPlateRecipe.itemName;
+        return replaceLoreLine(res, plain, repl);
+    }
+
+    private static ItemStack replaceLoreLine(ItemStack item, String target, String replacement) {
+        ItemMeta im = item.getItemMeta();
+        if (im == null) {
+            return item;
+        }
+        List<String> lore = im.getLore();
+        if (lore == null) {
+            return item;
+        }
+        for (int i = 0; i < lore.size(); i++) {
+            if (lore.get(i).equals(target)) {
+                lore.set(i, replacement);
+                break;
+            }
+        }
+        im.setLore(lore);
+        item.setItemMeta(im);
+        return item;
+    }
+
+    @Override
     public Material getRecipeRepresentationMaterial() {
         return Material.WRITTEN_BOOK;
     }

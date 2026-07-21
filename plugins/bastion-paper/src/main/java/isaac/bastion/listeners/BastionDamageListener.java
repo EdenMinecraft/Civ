@@ -19,10 +19,12 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.type.Dispenser;
 import org.bukkit.entity.EnderPearl;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockDispenseEvent;
+import org.bukkit.event.block.BlockFertilizeEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPistonEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
@@ -111,6 +113,28 @@ public final class BastionDamageListener implements Listener {
         involved.add(event.getBlock().getRelative(event.getDirection()).getLocation());
         if (stopBlockEvent(event.getBlock().getLocation(), involved)) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onFertilize(BlockFertilizeEvent event) {
+        Player player = event.getPlayer();
+        if (player == null) {
+            Set<Location> blocks = new HashSet<>();
+            for (BlockState state : event.getBlocks()) {
+                blocks.add(state.getLocation());
+            }
+            if (stopBlockEvent(event.getBlock().getLocation(), blocks)) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+        PermissionType permission = PermissionType.getPermission(Permissions.BASTION_PLACE);
+        boolean removed = event.getBlocks().removeIf(state -> blockManager
+            .getBlockingBastionsWithoutPermission(state.getLocation(), player.getUniqueId(), permission)
+            .stream().anyMatch(bastion -> !bastion.getType().isOnlyDirectDestruction()));
+        if (removed && !Bastion.getSettingManager().getIgnorePlacementMessages(player.getUniqueId())) {
+            player.sendMessage(ChatColor.RED + "Bastion prevented fertilizing");
         }
     }
 

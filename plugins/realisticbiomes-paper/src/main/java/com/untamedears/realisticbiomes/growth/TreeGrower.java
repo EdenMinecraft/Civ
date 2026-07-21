@@ -67,8 +67,8 @@ public class TreeGrower extends AgeableGrower {
      */
     private static Block findNWSapling(Block block, Material mat) {
         Block northwest = null;
-        for (Block nwCandidate : new Block[]{block, block.getRelative(1, 0, 1), block.getRelative(0, 0, 1),
-            block.getRelative(1, 0, 0)}) {
+        for (Block nwCandidate : new Block[]{block.getRelative(-1, 0, -1), block.getRelative(0, 0, -1),
+            block.getRelative(-1, 0, 0), block}) {
             if (adjacentSaplingCheck(mat, nwCandidate)) {
                 northwest = nwCandidate;
                 break;
@@ -83,35 +83,46 @@ public class TreeGrower extends AgeableGrower {
     private static void removeSapling(Block block) {
         PlantManager manager = RealisticBiomes.getInstance().getPlantManager();
         Plant plant = manager.getPlant(block);
-        if (plant == null) {
-            return;
+        if (plant != null) {
+            manager.deletePlant(plant);
         }
-        manager.deletePlant(plant);
         block.setType(Material.AIR);
     }
 
-    /**
-     * Remove a 2x2 saplings grid if the block is part of one
-     *
-     * @param block to check for
-     * @param mat   Sapling material
-     */
-    private static void clearBigTreeSaplings(Block block, Material mat) {
-        Block northwest = null;
-        Block northeast, southwest, southeast;
-        northwest = findNWSapling(block, mat);
-        if (northwest == null) {
-            return;
+    private static void deletePlantAt(Block block) {
+        PlantManager manager = RealisticBiomes.getInstance().getPlantManager();
+        Plant plant = manager.getPlant(block);
+        if (plant != null) {
+            manager.deletePlant(plant);
         }
+    }
 
-        northeast = northwest.getRelative(BlockFace.EAST);
-        southwest = northwest.getRelative(BlockFace.SOUTH);
-        southeast = northeast.getRelative(BlockFace.SOUTH);
+    private static void deleteBigTreePlants(Block northwest) {
+        Block northeast = northwest.getRelative(BlockFace.EAST);
+        Block southwest = northwest.getRelative(BlockFace.SOUTH);
+        Block southeast = northeast.getRelative(BlockFace.SOUTH);
 
-        removeSapling(northwest);
-        removeSapling(northeast);
-        removeSapling(southeast);
-        removeSapling(southwest);
+        deletePlantAt(northwest);
+        deletePlantAt(northeast);
+        deletePlantAt(southwest);
+        deletePlantAt(southeast);
+    }
+
+    /**
+     * Remove a 2x2 saplings grid given its north west block
+     *
+     * @param northwest the north west block of the 2x2 grid
+     * @param mat       Sapling material
+     */
+    private static void clearBigTreeSaplings(Block northwest, Material mat) {
+        Block northeast = northwest.getRelative(BlockFace.EAST);
+        Block southwest = northwest.getRelative(BlockFace.SOUTH);
+        Block southeast = northeast.getRelative(BlockFace.SOUTH);
+
+        northwest.setType(Material.AIR);
+        northeast.setType(Material.AIR);
+        southwest.setType(Material.AIR);
+        southeast.setType(Material.AIR);
     }
 
     private static TreeType remapSaplingToTree(Material mat, boolean big) {
@@ -169,21 +180,38 @@ public class TreeGrower extends AgeableGrower {
         }
         Material mat = block.getType();
         boolean canBeBig = canBeBig(mat);
+        Block northwest = null;
         if (canBeBig) {
             canBeBig = canGrowBig(block, mat);
+            if (canBeBig) {
+                northwest = findNWSapling(block, mat);
+            }
         }
         TreeType type = remapSaplingToTree(mat, canBeBig);
         if (type == null) {
             return true;
         }
-        if (canBeBig) {
-            clearBigTreeSaplings(block, mat);
+        if (canBeBig && northwest != null) {
+            clearBigTreeSaplings(northwest, mat);
+            if (!northwest.getLocation().getWorld().generateTree(northwest.getLocation(), type)) {
+                // failed, so restore all 4 saplings
+                Block northeast = northwest.getRelative(BlockFace.EAST);
+                Block southwest = northwest.getRelative(BlockFace.SOUTH);
+                Block southeast = northeast.getRelative(BlockFace.SOUTH);
+                northwest.setType(mat);
+                northeast.setType(mat);
+                southwest.setType(mat);
+                southeast.setType(mat);
+            } else {
+                // succeeded, so delete the plant records
+                deleteBigTreePlants(northwest);
+            }
         } else {
             block.setType(Material.AIR);
-        }
-        if (!block.getLocation().getWorld().generateTree(block.getLocation(), type)) {
-            //failed, so restore sapling, TODO restore 2x2
-            block.setType(mat);
+            if (!block.getLocation().getWorld().generateTree(block.getLocation(), type)) {
+                //failed, so restore sapling
+                block.setType(mat);
+            }
         }
         return true;
     }

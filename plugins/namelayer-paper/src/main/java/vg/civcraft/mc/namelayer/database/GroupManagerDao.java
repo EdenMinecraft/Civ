@@ -61,6 +61,14 @@ public class GroupManagerDao {
     private static final String getMembers = "select fm.member_name from faction_member fm "
         + "inner join faction_id id on id.group_name = ? "
         + "where fm.group_id = id.group_id and fm.role = ?";
+    // Ordered by PlayerType declaration precedence so a member listed under multiple roles resolves
+    // to the same winning role the per-type ctor loop produced (last put in values() order wins).
+    private static final String getAllMembers = "select fm.member_name, fm.role from faction_member fm "
+        + "inner join faction_id id on id.group_name = ? "
+        + "where fm.group_id = id.group_id "
+        + "order by case fm.role "
+        + "when 'MEMBERS' then 0 when 'MODS' then 1 when 'ADMINS' then 2 when 'OWNER' then 3 "
+        + "when 'NOT_BLACKLISTED' then 4 else 5 end";
     private static final String removeMember = "delete fm.* from faction_member fm "
         + "inner join faction_id fi on fi.group_id = fm.group_id "
         + "where fm.member_name = ? and fi.group_name =?";
@@ -760,6 +768,33 @@ public class GroupManagerDao {
         return members;
     }
 
+    public Map<UUID, PlayerType> getAllMembers(String groupName) {
+        Map<UUID, PlayerType> members = new HashMap<>();
+        try (Connection connection = db.getConnection();
+             PreparedStatement getMembers = connection.prepareStatement(GroupManagerDao.getAllMembers)) {
+            getMembers.setString(1, groupName);
+            try (ResultSet set = getMembers.executeQuery()) {
+                while (set.next()) {
+                    String uuid = set.getString(1);
+                    if (uuid == null) {
+                        continue;
+                    }
+                    String roleName = set.getString(2);
+                    PlayerType role = roleName == null ? null : PlayerType.getPlayerType(roleName);
+                    if (role == null) {
+                        continue;
+                    }
+                    members.put(UUID.fromString(uuid), role);
+                }
+            } catch (SQLException e) {
+                logger.log(Level.WARNING, "Problem getting all members for group " + groupName, e);
+            }
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Problem preparing to get all members for group " + groupName, e);
+        }
+        return members;
+    }
+
     public void removeMemberAsync(final UUID member, final String group) {
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, new Runnable() {
 
@@ -1303,7 +1338,9 @@ public class GroupManagerDao {
              PreparedStatement getDefaultGroup = connection.prepareStatement(GroupManagerDao.getDefaultGroup);) {
             getDefaultGroup.setString(1, uuid.toString());
             try (ResultSet set = getDefaultGroup.executeQuery();) {
-                group = set.getString(1);
+                if (set.next()) {
+                    group = set.getString(1);
+                }
             } catch (SQLException e) {
                 logger.log(Level.WARNING, "Problem getting default group for " + uuid, e);
             }

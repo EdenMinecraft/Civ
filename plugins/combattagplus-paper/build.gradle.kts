@@ -11,4 +11,5 @@ dependencies {
     }
 
     compileOnly(libs.barapi)
+    compileOnly(files("./libs/GSit-3.3.1.jar"))
 }

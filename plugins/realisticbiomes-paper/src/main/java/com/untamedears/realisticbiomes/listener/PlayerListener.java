@@ -118,6 +118,27 @@ public class PlayerListener implements Listener {
         return new InteractPlant(plant, plantConfig);
     }
 
+    // prevent right-clicking a managed sea pickle with sea pickles from consuming the item
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onSeaPickleRightClick(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null || clicked.getType() != Material.SEA_PICKLE) {
+            return;
+        }
+        ItemStack item = event.getItem();
+        if (item == null || item.getType() != Material.SEA_PICKLE) {
+            return;
+        }
+        Plant plant = plantManager.getPlant(clicked);
+        if (plant == null && growthConfigs.getGrowthConfigFallback(Material.SEA_PICKLE) == null) {
+            return;
+        }
+        event.setCancelled(true);
+    }
+
     // show animal rates when right clicking them with stick
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerInteractEntityEvent(PlayerInteractEntityEvent event) {

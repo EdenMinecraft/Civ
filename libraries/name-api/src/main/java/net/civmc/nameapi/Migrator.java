@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -32,33 +33,40 @@ public class Migrator {
 
     public void migrate(Connection connection) throws SQLException {
         connection.setAutoCommit(false);
-        connection.createStatement().executeUpdate("CREATE TABLE IF NOT EXISTS migrations (" +
-            "namespace VARCHAR(64) PRIMARY KEY," +
-            "id INT NOT NULL)");
+        try (Statement createTable = connection.createStatement()) {
+            createTable.executeUpdate("CREATE TABLE IF NOT EXISTS migrations (" +
+                "namespace VARCHAR(64) PRIMARY KEY," +
+                "id INT NOT NULL)");
+        }
 
         for (Map.Entry<String, NavigableMap<Integer, String[]>> entry : migrations.entrySet()) {
-            PreparedStatement getMigrationId = connection.prepareStatement("SELECT id FROM migrations WHERE namespace = ? FOR UPDATE");
-            getMigrationId.setString(1, entry.getKey());
-            ResultSet resultSet = getMigrationId.executeQuery();
             int minId;
-            if (resultSet.next()) {
-                minId = resultSet.getInt("id");
-            } else {
-                minId = -1;
+            try (PreparedStatement getMigrationId = connection.prepareStatement("SELECT id FROM migrations WHERE namespace = ? FOR UPDATE")) {
+                getMigrationId.setString(1, entry.getKey());
+                ResultSet resultSet = getMigrationId.executeQuery();
+                if (resultSet.next()) {
+                    minId = resultSet.getInt("id");
+                } else {
+                    minId = -1;
+                }
             }
 
             NavigableMap<Integer, String[]> value = entry.getValue().tailMap(minId, false);
             int maxId = entry.getValue().lastKey();
             for (String[] migration : value.sequencedValues()) {
                 for (String sql : migration) {
-                    connection.createStatement().executeUpdate(sql);
+                    try (Statement statement = connection.createStatement()) {
+                        statement.executeUpdate(sql);
+                    }
                 }
             }
 
             if (maxId != minId) {
-                PreparedStatement setMigrationId = connection.prepareStatement("REPLACE INTO migrations (namespace, id) VALUES (?, ?)");
-                setMigrationId.setString(1, entry.getKey());
-                setMigrationId.setInt(2, maxId);
+                try (PreparedStatement setMigrationId = connection.prepareStatement("REPLACE INTO migrations (namespace, id) VALUES (?, ?)")) {
+                    setMigrationId.setString(1, entry.getKey());
+                    setMigrationId.setInt(2, maxId);
+                    setMigrationId.executeUpdate();
+                }
             }
         }
         connection.setAutoCommit(true);

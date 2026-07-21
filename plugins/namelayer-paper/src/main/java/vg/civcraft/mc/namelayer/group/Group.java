@@ -58,11 +58,9 @@ public class Group {
             return;
         }
 
-        for (PlayerType permission : PlayerType.values()) {
-            List<UUID> list = db.getAllMembers(name, permission);
-            for (UUID uuid : list) {
-                players.put(uuid, permission);
-            }
+        Map<UUID, PlayerType> loadedMembers = db.getAllMembers(name);
+        if (loadedMembers != null) {
+            players.putAll(loadedMembers);
         }
 
         // This returns list of ids w/ id holding largest # of players at top.
@@ -563,6 +561,9 @@ public class Group {
      * @return Returns true if they equal, otherwise false.
      */
     public boolean isPassword(String password) {
+        if (this.password == null) {
+            return password == null;
+        }
         return this.password.equals(password);
     }
 

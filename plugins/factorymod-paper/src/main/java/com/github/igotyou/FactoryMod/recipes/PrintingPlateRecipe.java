@@ -23,6 +23,7 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.BookMeta.Generation;
+import org.bukkit.inventory.meta.ItemMeta;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemMap;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
 
@@ -150,6 +151,44 @@ public class PrintingPlateRecipe extends PrintingPressRecipe {
         }
 
         return stacks;
+    }
+
+    @Override
+    public ItemStack getRecipeRepresentation(Inventory inputInv) {
+        ItemStack res = super.getRecipeRepresentation(inputInv);
+        if (inputInv == null) {
+            return res;
+        }
+        int have = 0;
+        for (ItemStack is : inputInv.getContents()) {
+            if (is != null && is.getType() == Material.WRITTEN_BOOK) {
+                BookMeta meta = (BookMeta) is.getItemMeta();
+                if (meta.getGeneration() != Generation.TATTERED) {
+                    have++;
+                }
+            }
+        }
+        int needed = 1;
+        ChatColor color = have >= needed ? ChatColor.GREEN : ChatColor.RED;
+        String name = ItemUtils.getItemName(new ItemStack(Material.WRITTEN_BOOK));
+        String plain = ChatColor.GRAY + " - " + ChatColor.AQUA + "1 Written Book";
+        String repl = ChatColor.GRAY + " - " + color + have + "/" + needed + " " + name;
+
+        ItemMeta im = res.getItemMeta();
+        if (im != null) {
+            List<String> lore = im.getLore();
+            if (lore != null) {
+                for (int i = 0; i < lore.size(); i++) {
+                    if (lore.get(i).equals(plain)) {
+                        lore.set(i, repl);
+                        break;
+                    }
+                }
+                im.setLore(lore);
+                res.setItemMeta(im);
+            }
+        }
+        return res;
     }
 
     @Override

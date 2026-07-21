@@ -2,6 +2,7 @@ package sh.okx.railswitch.settings;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import sh.okx.railswitch.RailSwitchPlugin;
@@ -17,6 +18,8 @@ public final class SettingsManager {
 
     private static ResetSetting resetSetting;
 
+    private static DestinationScoreboard scoreboard;
+
     /**
      * Initialise the settings manager. This should only be called within RailSwitch onEnable().
      *
@@ -31,6 +34,15 @@ public final class SettingsManager {
         menu.registerToParentMenu();
         menu.registerSetting(destSetting);
         menu.registerSetting(resetSetting);
+
+        // Mirror the destination onto the sidebar scoreboard whenever it changes.
+        // setValue() fires listeners BEFORE storing the new value, so use newValue here, not getDestination().
+        scoreboard = new DestinationScoreboard();
+        destSetting.registerListener((uuid, setting, oldValue, newValue) -> {
+            if (scoreboard != null) {
+                scoreboard.update(Bukkit.getPlayer(uuid), newValue);
+            }
+        });
     }
 
     /**
@@ -38,6 +50,10 @@ public final class SettingsManager {
      */
     public static void reset() {
         // TODO: Deregister and unload all the menu elements once PlayerSettingAPI becomes reload safe
+        if (scoreboard != null) {
+            scoreboard.delete();
+            scoreboard = null;
+        }
         menu = null;
         destSetting = null;
         resetSetting = null;
@@ -80,6 +96,18 @@ public final class SettingsManager {
             return "";
         }
         return value;
+    }
+
+    /**
+     * Restores the player's destination line on the sidebar, e.g. when they log in.
+     * Reads the stored value directly because player settings are already loaded at join time.
+     *
+     * @param player The player whose destination line should be refreshed.
+     */
+    public static void restoreDestinationDisplay(Player player) {
+        if (scoreboard != null) {
+            scoreboard.update(player, getDestination(player));
+        }
     }
 
 }

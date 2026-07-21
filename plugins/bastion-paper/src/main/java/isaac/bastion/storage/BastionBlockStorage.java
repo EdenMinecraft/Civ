@@ -380,8 +380,9 @@ public class BastionBlockStorage {
      **/
 
     public void changeBastionGroup(BastionBlock bastion) {
-        if (bastion.getListGroupId() != null) {
-            List<BastionBlock> oldGroupBastions = groups.get(bastion.getListGroupId());
+        Integer oldGroupId = bastion.getListGroupId();
+        if (oldGroupId != null) {
+            List<BastionBlock> oldGroupBastions = groups.get(oldGroupId);
 
             if (oldGroupBastions != null) {
                 oldGroupBastions.remove(bastion);
@@ -451,27 +452,34 @@ public class BastionBlockStorage {
         }
     }
 
+    public void indexBastionByGroup(BastionBlock bastion, int groupId) {
+        synchronized (groups) {
+            List<BastionBlock> groupBastions = groups.get(groupId);
+            if (groupBastions == null) {
+                groups.put(groupId, groupBastions = new ArrayList<>());
+            }
+            groupBastions.add(bastion);
+        }
+    }
+
     private void addBastion(BastionBlock bastion) {
         bastions.add(bastion);
         blocks.put(bastion.getLocation().getWorld(), blocks.get(bastion.getLocation().getWorld()).add(bastion, bastion.asRectangle()));
 
-        if (bastion.getListGroupId() != null) {
-            synchronized (groups) {
-                List<BastionBlock> groupBastions = groups.get(bastion.getListGroupId());
-
-                if (groupBastions == null) {
-                    groups.put(bastion.getListGroupId(), groupBastions = new ArrayList<>());
-                }
-
-                groupBastions.add(bastion);
-            }
+        Integer groupId = bastion.getListGroupId();
+        if (groupId != null) {
+            indexBastionByGroup(bastion, groupId);
         }
     }
 
     private void removeBastion(BastionBlock bastion) {
-        if (bastion.getListGroupId() != null) {
+        // Read once outside the groups lock: the slow backfill in
+        // getListGroupId takes the bastion's monitor, and entering it while
+        // holding `groups` would reverse the lock order taken by addBastion.
+        Integer groupId = bastion.getListGroupId();
+        if (groupId != null) {
             synchronized (groups) {
-                List<BastionBlock> groupBastions = groups.get(bastion.getListGroupId());
+                List<BastionBlock> groupBastions = groups.get(groupId);
 
                 if (groupBastions != null) {
                     groupBastions.remove(bastion);

@@ -10,6 +10,7 @@ import net.minelink.ctplus.compat.base.NpcPlayerHelper;
 import net.minelink.ctplus.hook.Hook;
 import net.minelink.ctplus.hook.HookManager;
 import net.minelink.ctplus.listener.ForceFieldListener;
+import net.minelink.ctplus.listener.GSitListener;
 import net.minelink.ctplus.listener.InstakillListener;
 import net.minelink.ctplus.listener.NpcListener;
 import net.minelink.ctplus.listener.PlayerListener;
@@ -111,6 +112,8 @@ public final class CombatTagPlus extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new PlayerListener(this), this);
         Bukkit.getPluginManager().registerEvents(new TagListener(this), this);
+
+        Bukkit.getPluginManager().registerEvents(new GSitListener(this), this);
 
         // Anti-SafeZone task
         ForceFieldTask.run(this);

@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 
 import com.github.igotyou.FactoryMod.utility.MultiInventoryWrapper;
 import org.bukkit.Material;
@@ -48,58 +47,58 @@ public class DecompactingRecipe extends InputRecipe {
 
     @Override
     public EffectFeasibility evaluateEffectFeasibility(Inventory inputInv, Inventory outputInv) {
-        boolean isFeasible = Arrays.stream(inputInv.getContents())
-            .filter(Objects::nonNull)
-            .filter(this::isDecompactable)
-            .map(it -> {
-                ItemStack removeClone = it.clone();
+        for (ItemStack is : inputInv.getContents()) {
+            if (is != null && isDecompactable(is)) {
+                ItemStack removeClone = is.clone();
                 removeClone.setAmount(1);
                 removeCompactLore(removeClone);
                 ItemMap toAdd = new ItemMap(removeClone);
                 toAdd.addItemAmount(removeClone, CompactingRecipe.getCompactStackSize(removeClone.getType()));
-                return toAdd;
-            })
-            .allMatch(it -> it.fitsIn(outputInv));
-        return new EffectFeasibility(
-            isFeasible,
-            isFeasible ? null : "it ran out of storage space"
-        );
+                if (canFitInOutput(toAdd, outputInv)) {
+                    return new EffectFeasibility(true, null);
+                } else {
+                    return new EffectFeasibility(false, "it ran out of storage space");
+                }
+            }
+        }
+        return new EffectFeasibility(true, null);
     }
 
     @Override
     public boolean applyEffect(Inventory inputInv, Inventory outputInv, FurnCraftChestFactory fccf) {
         MultiInventoryWrapper combo = new MultiInventoryWrapper(inputInv, outputInv);
         logBeforeRecipeRun(combo, fccf);
-        if (input.isContainedIn(inputInv)) {
-            for (ItemStack is : inputInv.getContents()) {
-                if (is != null) {
-                    if (isDecompactable(is)) {
-                        ItemStack removeClone = is.clone();
-                        removeClone.setAmount(1);
-                        ItemMap toRemove = new ItemMap(removeClone);
-                        ItemMap toAdd = new ItemMap();
-                        removeCompactLore(removeClone);
-                        // Prevent dupe exploit: wipe items stuffed into a bundle after compaction
-                        if (removeClone.getItemMeta() instanceof BundleMeta) {
-                            BundleMeta bundleMeta = (BundleMeta) removeClone.getItemMeta();
-                            bundleMeta.setItems(new ArrayList<>());
-                            removeClone.setItemMeta(bundleMeta);
-                        }
-                        toAdd.addItemAmount(removeClone, CompactingRecipe.getCompactStackSize(removeClone.getType()));
-                        if (toAdd.fitsIn(outputInv)) { //fits in chest
-                            if (input.removeSafelyFrom(inputInv)) { //remove extra input
-                                if (toRemove.removeSafelyFrom(inputInv)) { //remove one compacted item
-                                    for (ItemStack add : toAdd.getItemStackRepresentation()) {
-                                        outputInv.addItem(add);
-                                    }
-                                }
-                            }
-                        } else { // does not fit in chest
-                            return false;
-                        }
-                        break;
-                    }
+        if (!input.isContainedIn(inputInv)) {
+            logAfterRecipeRun(combo, fccf);
+            return true;
+        }
+        for (ItemStack is : inputInv.getContents()) {
+            if (is != null && isDecompactable(is)) {
+                ItemStack removeClone = is.clone();
+                removeClone.setAmount(1);
+                ItemMap toRemove = new ItemMap(removeClone);
+                ItemMap toAdd = new ItemMap();
+                removeCompactLore(removeClone);
+                toAdd.addItemAmount(removeClone, CompactingRecipe.getCompactStackSize(removeClone.getType()));
+                if (!canFitInOutput(toAdd, outputInv)) {
+                    return false;
                 }
+                if (!input.removeSafelyFrom(inputInv)) {
+                    return false;
+                }
+                if (!toRemove.removeSafelyFrom(inputInv)) {
+                    restoreInput(input, inputInv, fccf);
+                    return false;
+                }
+                List<ItemStack> insertedOutput = new ArrayList<>();
+                if (!addOutputToInventorySafely(toAdd, outputInv, insertedOutput)) {
+                    rollbackOutput(outputInv, insertedOutput);
+                    restoreInput(toRemove, inputInv, fccf);
+                    restoreInput(input, inputInv, fccf);
+                    return false;
+                }
+                logAfterRecipeRun(combo, fccf);
+                return true;
             }
         }
         logAfterRecipeRun(combo, fccf);
@@ -195,4 +194,5 @@ public class DecompactingRecipe extends InputRecipe {
     public List<String> getTextualInputRepresentation(Inventory i, FurnCraftChestFactory fccf) {
         return Arrays.asList("A single compacted item");
     }
+
 }

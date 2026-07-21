@@ -134,11 +134,6 @@ public class AdminFunctionsGUI extends AbstractGroupGUI {
         ci.showInventory(p);
     }
 
-//	private void showLinkingMenu() {
-//		LinkingGUI lgui = new LinkingGUI(g, p, this);
-//		lgui.showScreen();
-//	}
-
     private void showMergingMenu() {
         MergeGUI mGui = new MergeGUI(g, p, this);
         mGui.showScreen();

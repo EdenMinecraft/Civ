@@ -158,11 +158,7 @@ public class PrintNoteRecipe extends PrintBookRecipe {
 
         @Override
     public List<String> getTextualInputRepresentation(Inventory i, FurnCraftChestFactory fccf) {
-        List<String> result = super.getTextualInputRepresentation(i, fccf);
-        
-        result.add("1 Printing Plate");
-
-        return result;
+        return super.getTextualInputRepresentation(i, fccf);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.github.igotyou.FactoryMod.recipes;
 
+import com.github.igotyou.FactoryMod.FactoryMod;
 import com.github.igotyou.FactoryMod.factories.Factory;
 import com.github.igotyou.FactoryMod.factories.FurnCraftChestFactory;
 import com.github.igotyou.FactoryMod.utility.LoggingUtils;
@@ -7,6 +8,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
@@ -149,13 +151,33 @@ public abstract class InputRecipe implements IRecipe {
      * whole in an item gui
      */
     public ItemStack getRecipeRepresentation() {
+        return getRecipeRepresentation(null);
+    }
+
+    public ItemStack getRecipeRepresentation(Inventory inputInv) {
         ItemStack res = new ItemStack(getRecipeRepresentationMaterial());
         ItemMeta im = res.getItemMeta();
         im.setDisplayName(ChatColor.DARK_GREEN + getName());
         List<String> lore = new ArrayList<>();
         lore.add(ChatColor.GOLD + "Input:");
-        for (String s : getTextualInputRepresentation(null, null)) {
-            lore.add(ChatColor.GRAY + " - " + ChatColor.AQUA + s);
+        List<String> textualInputs = getTextualInputRepresentation(null, null);
+        List<Entry<ItemStack, Integer>> baseItems = new ArrayList<>();
+        for (Entry<ItemStack, Integer> entry : input.getAllItems().entrySet()) {
+            if (entry.getValue() > 0) {
+                baseItems.add(entry);
+            }
+        }
+        ItemMap inventoryMap = inputInv != null ? new ItemMap(inputInv) : null;
+        for (int i = 0; i < textualInputs.size(); i++) {
+            if (i < baseItems.size() && inputInv != null) {
+                Entry<ItemStack, Integer> entry = baseItems.get(i);
+                String name = formatIngredientName(entry.getKey());
+                int have = inventoryMap.getAmount(entry.getKey());
+                ChatColor color = have >= entry.getValue() ? ChatColor.GREEN : ChatColor.RED;
+                lore.add(ChatColor.GRAY + " - " + color + have + "/" + entry.getValue() + " " + name);
+            } else {
+                lore.add(ChatColor.GRAY + " - " + ChatColor.AQUA + textualInputs.get(i));
+            }
         }
         lore.add("");
         lore.add(ChatColor.GOLD + "Output:");
@@ -214,41 +236,159 @@ public abstract class InputRecipe implements IRecipe {
         return identifier.hashCode();
     }
 
+    protected String formatIngredientName(ItemStack item) {
+        if (item == null || item.isEmpty()) {
+            return "Unknown";
+        }
+        if (CustomItem.isCustomItem(item)) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                if (meta.hasDisplayName()) {
+                    return StringUtils.abbreviate(meta.getDisplayName(), 35);
+                } else if (meta.hasItemName()) {
+                    return StringUtils.abbreviate(meta.getItemName(), 35);
+                }
+            }
+            return ChatColor.ITALIC + ItemUtils.getItemName(item);
+        }
+        if (!item.hasItemMeta()) {
+            return ItemUtils.getItemName(item);
+        }
+        ItemMeta meta = item.getItemMeta();
+        String name = ChatColor.ITALIC + ItemUtils.getItemName(item);
+        if (meta.hasDisplayName()) {
+            name += String.format("%s [%s%1$s]", ChatColor.DARK_AQUA, StringUtils.abbreviate(meta.getDisplayName(), 20));
+        }
+        return name;
+    }
+
     protected List<String> formatLore(ItemMap ingredients) {
         List<String> result = new ArrayList<>();
         for (Entry<ItemStack, Integer> entry : ingredients.getItems().entrySet()) {
             if (entry.getValue() > 0) {
-                if (!entry.getKey().hasItemMeta()) {
-                    result.add(entry.getValue() + " " + ItemUtils.getItemName(entry.getKey()));
-                } else {
-                    String lore = String.format("%s %s%s", entry.getValue(), ChatColor.ITALIC, ItemUtils.getItemName(entry.getKey()));
-                    if (entry.getKey().getItemMeta().hasDisplayName()) {
-                        lore += String.format("%s [%s%1$s]", ChatColor.DARK_AQUA, StringUtils.abbreviate(entry.getKey().getItemMeta().getDisplayName(), 20));
-                    }
-                    result.add(lore);
-                }
+                result.add(entry.getValue() + " " + formatIngredientName(entry.getKey()));
             }
         }
         // Custom items should have their custom name displayed more prominently, their actual item type is irrelevant
         for (Entry<String, Integer> entry : ingredients.getCustomItems().entrySet()) {
             if (entry.getValue() > 0) {
                 ItemStack item = CustomItem.getCustomItem(entry.getKey());
-                if (!item.hasItemMeta()) {
-                    result.add(entry.getValue() + " " + ItemUtils.getItemName(item));
-                } else {
-                    String lore;
-                    if (item.getItemMeta().hasDisplayName()) {
-                        lore = String.format("%s %s", entry.getValue(), StringUtils.abbreviate(item.getItemMeta().getDisplayName(), 35));
-                    } else if (item.getItemMeta().hasItemName()) {
-                        lore = String.format("%s %s", entry.getValue(), StringUtils.abbreviate(item.getItemMeta().getItemName(), 35));
-                    } else {
-                        lore = String.format("%s %s%s", entry.getValue(), ChatColor.ITALIC, ItemUtils.getItemName(item));
-                    }
-                    result.add(lore);
-                }
+                result.add(entry.getValue() + " " + formatIngredientName(item));
             }
         }
         return result;
+    }
+
+    protected boolean canFitInOutput(ItemMap outputMap, Inventory outputInv) {
+        ItemStack[] currentContent = outputInv.getStorageContents();
+        ItemStack[] simulatedOutput = new ItemStack[currentContent.length];
+        for (int i = 0; i < currentContent.length; i++) {
+            ItemStack slot = currentContent[i];
+            simulatedOutput[i] = slot == null ? null : slot.clone();
+        }
+
+        for (Entry<ItemStack, Integer> outputEntry : outputMap.getAllItems().entrySet()) {
+            ItemStack outputTemplate = outputEntry.getKey();
+            int remainingAmount = outputEntry.getValue();
+            if (outputTemplate == null || outputTemplate.isEmpty() || remainingAmount <= 0) {
+                continue;
+            }
+
+            int maxStackSize = Math.max(1, outputTemplate.getMaxStackSize());
+            for (int i = 0; i < simulatedOutput.length && remainingAmount > 0; i++) {
+                ItemStack existingStack = simulatedOutput[i];
+                if (existingStack == null || existingStack.isEmpty() || !existingStack.isSimilar(outputTemplate)) {
+                    continue;
+                }
+                int existingMaxStackSize = Math.max(1, existingStack.getMaxStackSize());
+                int freeSpace = Math.max(0, existingMaxStackSize - existingStack.getAmount());
+                if (freeSpace <= 0) {
+                    continue;
+                }
+                int movedAmount = Math.min(remainingAmount, freeSpace);
+                existingStack.setAmount(existingStack.getAmount() + movedAmount);
+                remainingAmount -= movedAmount;
+            }
+
+            for (int i = 0; i < simulatedOutput.length && remainingAmount > 0; i++) {
+                ItemStack existingStack = simulatedOutput[i];
+                if (existingStack != null && !existingStack.isEmpty()) {
+                    continue;
+                }
+                int movedAmount = Math.min(remainingAmount, maxStackSize);
+                ItemStack toInsert = outputTemplate.clone();
+                toInsert.setAmount(movedAmount);
+                simulatedOutput[i] = toInsert;
+                remainingAmount -= movedAmount;
+            }
+
+            if (remainingAmount > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected boolean addOutputToInventorySafely(ItemMap outputMap, Inventory outputInv, List<ItemStack> insertedOutput) {
+        for (Entry<ItemStack, Integer> outputEntry : outputMap.getAllItems().entrySet()) {
+            ItemStack outputTemplate = outputEntry.getKey();
+            int remainingAmount = outputEntry.getValue();
+            if (outputTemplate == null || outputTemplate.isEmpty() || remainingAmount <= 0) {
+                continue;
+            }
+
+            int maxStackSize = Math.max(1, outputTemplate.getMaxStackSize());
+            while (remainingAmount > 0) {
+                int movedAmount = Math.min(remainingAmount, maxStackSize);
+                ItemStack toInsert = outputTemplate.clone();
+                toInsert.setAmount(movedAmount);
+                Map<Integer, ItemStack> overflow = outputInv.addItem(toInsert);
+                int overflowAmount = 0;
+                for (ItemStack overflowStack : overflow.values()) {
+                    overflowAmount += overflowStack.getAmount();
+                }
+                int insertedAmount = movedAmount - overflowAmount;
+                if (insertedAmount > 0) {
+                    ItemStack insertedStack = outputTemplate.clone();
+                    insertedStack.setAmount(insertedAmount);
+                    insertedOutput.add(insertedStack);
+                }
+                if (!overflow.isEmpty()) {
+                    return false;
+                }
+                remainingAmount -= movedAmount;
+            }
+        }
+        return true;
+    }
+
+    protected void rollbackOutput(Inventory outputInv, List<ItemStack> insertedOutput) {
+        for (ItemStack outputStack : insertedOutput) {
+            outputInv.removeItem(outputStack);
+        }
+    }
+
+    protected void restoreInput(ItemMap removedInput, Inventory inputInv, FurnCraftChestFactory fccf) {
+        for (Entry<ItemStack, Integer> removedEntry : removedInput.getAllItems().entrySet()) {
+            ItemStack removedTemplate = removedEntry.getKey();
+            int remainingAmount = removedEntry.getValue();
+            if (removedTemplate == null || removedTemplate.isEmpty() || remainingAmount <= 0) {
+                continue;
+            }
+
+            int maxStackSize = Math.max(1, removedTemplate.getMaxStackSize());
+            while (remainingAmount > 0) {
+                int movedAmount = Math.min(remainingAmount, maxStackSize);
+                ItemStack removedStack = removedTemplate.clone();
+                removedStack.setAmount(movedAmount);
+                Map<Integer, ItemStack> overflow = inputInv.addItem(removedStack);
+                if (!overflow.isEmpty()) {
+                    FactoryMod.getInstance().warning("Failed to fully restore input after recipe rollback :(," + fccf.getLogData());
+                    return;
+                }
+                remainingAmount -= movedAmount;
+            }
+        }
     }
 
 }

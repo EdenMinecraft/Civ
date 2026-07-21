@@ -3,6 +3,7 @@ package com.github.longboyy.repelshitters;
 import io.papermc.paper.event.entity.EntityMoveEvent;
 import isaac.bastion.Bastion;
 import isaac.bastion.BastionBlock;
+import isaac.bastion.Permissions;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -17,6 +18,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import vg.civcraft.mc.namelayer.NameLayerAPI;
+import vg.civcraft.mc.namelayer.permission.PermissionType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -416,7 +419,11 @@ public class HappyGhastManager {
 
         for (BastionBlock bastion : bastions) {
             // Skip friendly bastions
-            if (bastion.canPlace(finalPilot)) continue;
+            if(NameLayerAPI.getGroupManager().hasAccess(bastion.getGroup(), finalPilot.getUniqueId(), PermissionType.getPermission(Permissions.BASTION_PLACE))){
+                continue;
+            }
+
+            //if (bastion.canPlace(finalPilot)) continue;
 
             // Optionally skip immature bastions
             if (plugin.getConfigManager().isRequireMaturity()) {

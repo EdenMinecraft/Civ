@@ -6,9 +6,13 @@ import com.github.igotyou.FactoryMod.utility.MultiInventoryWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import vg.civcraft.mc.civmodcore.inventory.CustomItem;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemMap;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
@@ -20,19 +24,24 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 
 public class WordBankRecipe extends InputRecipe {
 
-    private String key;
+    private final String key;
     private MessageDigest digest;
-    private List<String> validWords;
+    private final List<String> validWords;
+    private final Set<String> validWordSet;
 
-    private List<ChatColor> colors;
-    private int words;
-    private SecureRandom preview;
+    private final List<ChatColor> colors;
+    private final Set<String> colorStrings;
+    private final int words;
+    private final SecureRandom preview;
+    private final NamespacedKey wordbankedKey;
 
     public WordBankRecipe(String identifier, String name, int productionTime, String key, List<String> words,
                           List<ChatColor> colors, int wordCount) {
@@ -45,8 +54,14 @@ public class WordBankRecipe extends InputRecipe {
         this.key = key;
         this.words = wordCount;
         this.validWords = words;
+        this.validWordSet = new HashSet<>(words);
         this.colors = colors;
+        this.colorStrings = new HashSet<>();
+        for (ChatColor color : colors) {
+            this.colorStrings.add(color.toString());
+        }
         this.preview = new SecureRandom();
+        this.wordbankedKey = new NamespacedKey(FactoryMod.getInstance(), "wordbanked");
     }
 
     @Override
@@ -56,7 +71,7 @@ public class WordBankRecipe extends InputRecipe {
         if (!ItemUtils.isValidItem(toApply)) {
             return false;
         }
-        if (!ItemUtils.getDisplayName(toApply).isEmpty()) {
+        if (isWordBanked(toApply)) {
             return false;
         }
         ItemMap input = new ItemMap();
@@ -83,7 +98,10 @@ public class WordBankRecipe extends InputRecipe {
         }
         String result = sb.substring(0, sb.length() - 2);
         String name = getHash(input);
-        ItemUtils.setDisplayName(toApply, name);
+        ItemMeta meta = toApply.getItemMeta();
+        meta.setDisplayName(name);
+        meta.getPersistentDataContainer().set(wordbankedKey, PersistentDataType.BYTE, (byte) 1);
+        toApply.setItemMeta(meta);
         if (fccf.getActivator() != null) {
             Player player = Bukkit.getPlayer(fccf.getActivator());
             if (player != null) {
@@ -128,12 +146,18 @@ public class WordBankRecipe extends InputRecipe {
     }
 
     @Override
+    public EffectFeasibility evaluateEffectFeasibility(Inventory inputInv, Inventory outputInv) {
+        ItemStack toApply = inputInv.getItem(0);
+        if (ItemUtils.isValidItem(toApply) && isWordBanked(toApply)) {
+            return new EffectFeasibility(false, "the item has already been wordbanked");
+        }
+        return new EffectFeasibility(true, null);
+    }
+
+    @Override
     public boolean enoughMaterialAvailable(Inventory inputInv) {
         ItemStack toApply = inputInv.getItem(0);
         if (!ItemUtils.isValidItem(toApply)) {
-            return false;
-        }
-        if (!ItemUtils.getDisplayName(toApply).isEmpty()) {
             return false;
         }
         for (int i = 1; i < inputInv.getSize(); i++) {
@@ -147,6 +171,48 @@ public class WordBankRecipe extends InputRecipe {
             return true;
         }
         return false;
+    }
+
+    private boolean isWordBanked(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            PersistentDataContainer pdc = meta.getPersistentDataContainer();
+            if (pdc.has(wordbankedKey, PersistentDataType.BYTE)) {
+                return true;
+            }
+        }
+        String displayName = ItemUtils.getDisplayName(item);
+        if (displayName == null || displayName.isEmpty()) {
+            return false;
+        }
+        String firstColor = null;
+        for (String colorStr : colorStrings) {
+            if (displayName.startsWith(colorStr)) {
+                firstColor = colorStr;
+                break;
+            }
+        }
+        if (firstColor == null) {
+            return false;
+        }
+        String rest = displayName.substring(firstColor.length());
+        if (rest.contains(String.valueOf(ChatColor.COLOR_CHAR))) {
+            return false;
+        }
+        String stripped = ChatColor.stripColor(rest);
+        if (stripped.isEmpty()) {
+            return false;
+        }
+        String[] wordParts = stripped.split(" ");
+        if (wordParts.length < 1 || wordParts.length > words) {
+            return false;
+        }
+        for (String word : wordParts) {
+            if (!validWordSet.contains(word)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private synchronized String getHash(ItemMap items) {

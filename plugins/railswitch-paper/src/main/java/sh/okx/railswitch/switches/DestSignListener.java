@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
 import sh.okx.railswitch.settings.SettingsManager;
 
 public final class DestSignListener implements Listener {
@@ -20,6 +21,9 @@ public final class DestSignListener implements Listener {
 
         //detect if is a dest sign
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         Player player = event.getPlayer();

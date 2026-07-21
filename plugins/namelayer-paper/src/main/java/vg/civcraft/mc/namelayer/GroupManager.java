@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -29,6 +30,12 @@ public class GroupManager {
 
     private static Map<String, Group> groupsByName = new ConcurrentHashMap<>();
     private static Map<Integer, Group> groupsById = new ConcurrentHashMap<>();
+    // Group ids that resolved to nothing in the database. Citadel reinforcements and JukeAlert
+    // snitches keep referencing deleted group ids forever, and getGroup(int) runs its query on the
+    // calling (main) thread — without negative caching every hit on such a block is a blocking
+    // round-trip, which has caused multi-second tick stalls during fights. Cleared wholesale in
+    // invalidateCache so a manually restored group is picked up without a restart.
+    private static Set<Integer> missingGroupIds = ConcurrentHashMap.newKeySet();
 
     private static boolean mergingInProgress = false;
 
@@ -105,6 +112,7 @@ public class GroupManager {
             NameLayerPlugin.log(Level.INFO, "Group create was cancelled for group: " + group.getName());
             postCreate.setGroup(new Group(group.getName(), group.getOwner(), true, group.getPassword(), -1, System.currentTimeMillis(), group.getGroupColor().toString()));
             Bukkit.getScheduler().runTask(NameLayerPlugin.getInstance(), postCreate);
+            return;
         }
         final String name = event.getGroupName();
         final UUID owner = event.getOwner();
@@ -348,20 +356,24 @@ public class GroupManager {
     }
 
     public static Group getGroup(int groupId) {
-        if (groupsById.containsKey(groupId)) {
-            return groupsById.get(groupId);
-        } else {
-            Group group = groupManagerDao.getGroup(groupId);
-            if (group != null) {
-                groupsByName.put(group.getName().toLowerCase(), group);
-                for (int j : group.getGroupIds()) {
-                    groupsById.put(j, group);
-                }
-            } else {
-                NameLayerPlugin.getInstance().getLogger().log(Level.INFO, "getGroup by ID failed, unable to find the group " + groupId);
-            }
-            return group;
+        Group cached = groupsById.get(groupId);
+        if (cached != null) {
+            return cached;
         }
+        if (missingGroupIds.contains(groupId)) {
+            return null;
+        }
+        Group group = groupManagerDao.getGroup(groupId);
+        if (group != null) {
+            groupsByName.put(group.getName().toLowerCase(), group);
+            for (int j : group.getGroupIds()) {
+                groupsById.put(j, group);
+            }
+        } else {
+            missingGroupIds.add(groupId);
+            NameLayerPlugin.getInstance().getLogger().log(Level.INFO, "getGroup by ID failed, unable to find the group " + groupId);
+        }
+        return group;
     }
 
     public static boolean hasGroup(String groupName) {
@@ -434,8 +446,14 @@ public class GroupManager {
         if (p != null && (p.isOp() || p.hasPermission("namelayer.admin"))) {
             return true;
         }
-        if (group == null || perm == null) {
-            NameLayerPlugin.getInstance().getLogger().log(Level.INFO, "hasAccess failed, caller passed in null", new Exception());
+        // A null perm means the caller passed a bad permission constant: a real bug worth a trace.
+        // A null group is a normal "deny" (an unloaded or deleted group, routinely produced by
+        // movement handlers like Bastion's overlay) and must not spam a stack trace every tick.
+        if (perm == null) {
+            NameLayerPlugin.getInstance().getLogger().log(Level.INFO, "hasAccess failed, caller passed in null perm", new Exception());
+            return false;
+        }
+        if (group == null) {
             return false;
         }
         if (!group.isValid()) {
@@ -522,28 +540,17 @@ public class GroupManager {
             return;
         }
 
+        // Any group change may turn a previously-missing id valid (merges, manual repair), so the
+        // negative cache is cleared wholesale; missing ids re-cache on their next lookup.
+        missingGroupIds.clear();
+
         Group g = groupsByName.get(group.toLowerCase());
         if (g != null) {
             g.setValid(false);
-            List<Integer> k = g.getGroupIds();
             groupsByName.remove(group.toLowerCase());
             NameLayerPlugin.getBlackList().removeFromCache(g.getName());
-
-            boolean fail = true;
-            // You have a freaking hashmap, use it.
-            for (int j : k) {
-                if (groupsById.remove(j) != null) {
-                    fail = false;
-                }
-            }
-
-            // FALLBACK is hardloop
-            if (fail) { // can't find ID or cache is wrong.
-                for (Group x : groupsById.values()) {
-                    if (x.getName().equals(g.getName())) {
-                        groupsById.remove(x.getGroupId());
-                    }
-                }
+            for (int j : g.getGroupIds()) {
+                groupsById.remove(j);
             }
         } else {
             NameLayerPlugin.getInstance().getLogger().log(Level.INFO, "Invalidate cache by name failed, unable to find the group " + group);

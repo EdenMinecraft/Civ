@@ -12,4 +12,7 @@ dependencies {
     compileOnly(project(":plugins:civmodcore-paper"))
     compileOnly(project(":plugins:namelayer-paper"))
     compileOnly(project(":plugins:citadel-paper"))
+
+    testImplementation(libs.bundles.junit)
+    testImplementation(project(":plugins:civmodcore-paper"))
 }

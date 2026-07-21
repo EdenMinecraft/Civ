@@ -228,40 +228,40 @@ public class Database {
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z) {
-        return insertData(key, world, server, chunk_x, chunk_z, null, null, null, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, null, null, null, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, String value) {
-        return insertData(key, world, server, chunk_x, chunk_z, null, value, null, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, null, value, null, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, Number value) {
-        return insertData(key, world, server, chunk_x, chunk_z, null, null, value, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, null, null, value, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, String sValue, Number nValue) {
-        return insertData(key, world, server, chunk_x, chunk_z, null, sValue, nValue, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, null, sValue, nValue, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, String sValue, Number nValue,
                           Long time, Connection connection) {
-        return insertData(key, world, server, chunk_x, chunk_z, null, sValue, nValue, time, connection);
+        return insertData(key, server, world, chunk_x, chunk_z, null, sValue, nValue, time, connection);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, UUID uuid) {
-        return insertData(key, world, server, chunk_x, chunk_z, uuid, null, null, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, uuid, null, null, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, UUID uuid, String value) {
-        return insertData(key, world, server, chunk_x, chunk_z, uuid, value, null, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, uuid, value, null, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, UUID uuid, Number value) {
-        return insertData(key, world, server, chunk_x, chunk_z, uuid, null, value, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, uuid, null, value, null, null);
     }
 
     public int insertData(String key, String server, String world, Integer chunk_x, Integer chunk_z, UUID uuid, String sValue, Number nValue) {
-        return insertData(key, world, server, chunk_x, chunk_z, uuid, sValue, nValue, null, null);
+        return insertData(key, server, world, chunk_x, chunk_z, uuid, sValue, nValue, null, null);
     }
 
     /**

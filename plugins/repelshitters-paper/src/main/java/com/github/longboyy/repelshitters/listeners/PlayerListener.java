@@ -95,8 +95,11 @@ public class PlayerListener implements Listener {
     public void onPlayerHitPlayer(EntityDamageByEntityEvent event){
         if(event.getDamager().getType() != EntityType.PLAYER && event.getEntity().getType() != EntityType.PLAYER) return;
 
-        Player damager = (Player) event.getDamager();
-        event.setDamage(event.getDamage() / this.calculateScalar(damager));
+        if(event.getEntity() instanceof Player damager){
+            event.setDamage(event.getDamage() / this.calculateScalar(damager));
+        }
+
+
     }
 
     private float calculateScalar(Player player){

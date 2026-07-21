@@ -49,8 +49,6 @@ import vg.civcraft.mc.civmodcore.players.settings.PlayerSettingAPI;
 import vg.civcraft.mc.civmodcore.players.settings.impl.BooleanSetting;
 import vg.civcraft.mc.namelayer.GroupManager;
 import vg.civcraft.mc.namelayer.NameLayerAPI;
-import vg.civcraft.mc.namelayer.NameLayerPlugin;
-import vg.civcraft.mc.namelayer.database.GroupManagerDao;
 
 public class EntityListener implements Listener {
 
@@ -183,8 +181,7 @@ public class EntityListener implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
-                GroupManagerDao db = NameLayerPlugin.getGroupManagerDao();
-                for (String groupName : db.getGroupNames(uuid)) {
+                for (String groupName : gm.getAllGroupNames(uuid)) {
                     if (NameLayerAPI.getGroupManager().hasAccess(groupName, uuid,
                         CitadelPermissionHandler.getBypass())) {
                         GroupManager.getGroup(groupName).updateActivityTimeStamp();

@@ -28,7 +28,7 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
     private int id = -1;
     private long placed; //time when the bastion block was created
     private BastionType type;
-    private Integer listGroupId;
+    private volatile Integer listGroupId;
 
     /**
      * constructor for blocks loaded from database
@@ -48,11 +48,7 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
         Reinforcement reinforcement = getReinforcement();
         if (reinforcement != null) {
             this.listGroupId = reinforcement.getGroupId();
-        } else {
-            destroy();
-            Bastion.getPlugin().severe("Reinforcement removed during BastionBlock instantiation, removing at " + location.toString());
         }
-
     }
 
     /**
@@ -200,7 +196,8 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
      * @return true if the Bastion's strength is at zero and it should be removed
      */
     public boolean shouldCull() {
-        return getReinforcement() == null || getReinforcement().getHealth() < 0;
+        Reinforcement rein = getReinforcement();
+        return rein != null && rein.getHealth() <= 0;
     }
 
     /**
@@ -210,9 +207,6 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
         Reinforcement rein = getReinforcement();
         if (rein != null) {
             ReinforcementLogic.damageReinforcement(rein, -1, null);
-        } else {
-            destroy();
-            Bastion.getPlugin().severe("Reinforcement removed without removing bastion, fixed at " + location);
         }
     }
 
@@ -226,10 +220,9 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
         if (rein == null) {
             return;
         }
-        ReinforcementLogic.damageReinforcement(getReinforcement(), (float) amount, null);
-        if (shouldCull()) {
+        ReinforcementLogic.damageReinforcement(rein, (float) amount, null);
+        if (rein.getHealth() <= 0) {
             destroy();
-            Bastion.getPlugin().severe("Reinforcement destroyed, removing bastion");
         }
     }
 
@@ -256,19 +249,16 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
      * @return The reinforcement for this bastion
      */
     public Reinforcement getReinforcement() {
-        Reinforcement reinforcement = Citadel.getInstance().getReinforcementManager().getReinforcement(location);
-        if (reinforcement == null) {
-            destroy();
-            Bastion.getPlugin().severe("Reinforcement no longer exists, but bastion not removed, fixed at " + location);
-        }
-        return reinforcement;
+        return Citadel.getInstance().getReinforcementManager().getReinforcement(location);
     }
 
     /**
-     * Gets the owner of the bastion's group
+     * Gets the owner of the bastion's group, or null if the reinforcement is unavailable.
      */
     public UUID getOwner() {
-        return getReinforcement().getGroup().getOwner();
+        Reinforcement rein = getReinforcement();
+        if (rein == null) return null;
+        return rein.getGroup().getOwner();
     }
 
     /**
@@ -315,7 +305,27 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
     }
 
     public Integer getListGroupId() {
-        return this.listGroupId;
+        Integer cached = this.listGroupId;
+        if (cached != null) {
+            return cached;
+        }
+        // Backfill: bastion was constructed during a transient null lookup
+        // (cache miss on unloaded chunk). Double-checked locking serialises
+        // concurrent getListGroupId callers on the same bastion; other
+        // mutators of the group index (changeBastionGroup) must coordinate
+        // independently.
+        synchronized (this) {
+            if (this.listGroupId != null) {
+                return this.listGroupId;
+            }
+            Reinforcement rein = getReinforcement();
+            if (rein != null) {
+                int groupId = rein.getGroupId();
+                this.listGroupId = groupId;
+                Bastion.getBastionStorage().indexBastionByGroup(this, groupId);
+            }
+            return this.listGroupId;
+        }
     }
 
     public void setListGroupId(Integer groupId) {
@@ -358,7 +368,8 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
         SimpleDateFormat dateFormator = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
         StringBuilder result = new StringBuilder(ChatColor.GOLD + "" + ChatColor.BOLD + "Bastion Info" + ChatColor.AQUA + "\n");
 
-        result.append("Health: " + ChatColor.GOLD + "" + getStrengthText() + ChatColor.AQUA + "\n");
+        String strength = getStrengthText();
+        result.append("Health: " + ChatColor.GOLD + "" + (strength != null ? strength : "unknown") + ChatColor.AQUA + "\n");
         if (!isMature()) {
             result.append("Mature in: " + ChatColor.GOLD + "" + TextUtil.formatDuration(type.getWarmupTime()) + ChatColor.AQUA + "\n");
         } else {
@@ -432,22 +443,26 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
     }
 
     private String getGroupName() {
-        if (this.listGroupId == null) return "";
+        Integer groupId = getListGroupId();
+        if (groupId == null) return "";
 
-        Group group = GroupManager.getGroup(this.listGroupId);
+        Group group = GroupManager.getGroup(groupId);
 
         return group != null ? group.getName() : "";
     }
 
     public Group getGroup() {
-        return GroupManager.getGroup(this.listGroupId);
+        Integer groupId = getListGroupId();
+        if (groupId == null) return null;
+        return GroupManager.getGroup(groupId);
     }
 
     public String getStrengthText() {
-        return formatter.format(getReinforcement().getHealth()) + "/" + formatter.format(getReinforcement().getType().getHealth());
+        Reinforcement rein = getReinforcement();
+        if (rein == null) return null;
+        return formatter.format(rein.getHealth()) + "/" + formatter.format(rein.getType().getHealth());
     }
 
-    // TODO: Test world-aware comparison
     @Override
     public int compareTo(BastionBlock other) {
         UUID thisWorld = location.getWorld().getUID();
@@ -455,7 +470,7 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
         int thisY = location.getBlockY();
         int thisZ = location.getBlockZ();
 
-        UUID otherWorld = location.getWorld().getUID();
+        UUID otherWorld = other.location.getWorld().getUID();
         int otherX = other.location.getBlockX();
         int otherY = other.location.getBlockY();
         int otherZ = other.location.getBlockZ();
