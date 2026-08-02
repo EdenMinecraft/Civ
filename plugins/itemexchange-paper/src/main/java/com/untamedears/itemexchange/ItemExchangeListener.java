@@ -95,6 +95,11 @@ public final class ItemExchangeListener implements Listener {
         // Attempt to parse a shop from the shop block or relays.
         ShopRule shop = ShopRule.resolveShop(clicked);
         if (!Validation.checkValidity(shop)) {
+            // A shop whose every exchange was disabled for being oversized isn't a valid shop, so say so rather
+            // than leaving the owner with a container that silently does nothing.
+            if (shop != null && shop.hasOversizedTrades()) {
+                shop.warnAboutOversizedTrades(player);
+            }
             PLUGIN.debug("[Shop] Cancelling, that is not a shop.");
             return;
         }
@@ -137,8 +142,6 @@ public final class ItemExchangeListener implements Listener {
             return;
         }
         PLUGIN.debug("[Shop] Valid trade found.");
-        ExchangeRule inputRule = trade.getInput();
-        ExchangeRule outputRule = trade.getOutput();
         // Check if the input is limited to a group, and if so whether the viewer
         // has permission to purchase from that group. If NameLayer is enabled.
         BrowseOrPurchaseEvent limitTester = BrowseOrPurchaseEvent.emit(shop, trade, player);
@@ -147,8 +150,8 @@ public final class ItemExchangeListener implements Listener {
             PLUGIN.debug("[Shop] Buyer cannot purchase from that Group limited trade. Browsing.");
         }
         // If the player's hand is empty or holding the wrong item, just scroll
-        // through the catalogue.
-        if (justBrowsing || !inputRule.conforms(event.getItem())) {
+        // through the catalogue. The held item need only match one of the inputs.
+        if (justBrowsing || trade.getInputs().stream().noneMatch((rule) -> rule.conforms(event.getItem()))) {
             if (shouldCycle) {
                 trade = shop.cycleTrades(!player.isSneaking());
                 if (trade == null) {
@@ -164,17 +167,17 @@ public final class ItemExchangeListener implements Listener {
             return;
         }
         PLUGIN.debug("[Shop] Attempting transaction.");
-        // Check that the buyer has enough of the inputs
-        ItemStack[] inputItems = inputRule.getStock(player.getInventory());
+        // Check that the buyer has enough of every input
+        ItemStack[] inputItems = Utilities.getStock(trade.getInputs(), player.getInventory());
         if (inputItems.length < 1) {
             PLUGIN.debug("[Shop] Cancelling, buyer doesn't have enough of the input.");
             player.sendMessage(ChatColor.RED + "You don't have enough of the input.");
             return;
         }
-        // Check that the shop has enough of the outputs if needed
+        // Check that the shop has enough of every output if needed
         ItemStack[] outputItems = new ItemStack[0];
-        if (trade.hasOutput()) {
-            outputItems = outputRule.getStock(trade.getInventory());
+        if (trade.hasOutputs()) {
+            outputItems = Utilities.getStock(trade.getOutputs(), trade.getInventory());
             if (outputItems.length < 1) {
                 PLUGIN.debug("[Shop] Cancelling, shop doesn't have enough of the output.");
                 player.sendMessage(ChatColor.RED + "Shop does not have enough in stock.");
@@ -183,7 +186,7 @@ public final class ItemExchangeListener implements Listener {
         }
         // Attempt to transfer the items between the shop and the buyer
         boolean successfulTransfer;
-        if (trade.hasOutput()) {
+        if (trade.hasOutputs()) {
             successfulTransfer = InventoryUtils.safelyTradeBetweenInventories(
                 player.getInventory(),
                 trade.getInventory(),
@@ -202,7 +205,7 @@ public final class ItemExchangeListener implements Listener {
         }
         Stream.of(clicked, trade.getBlock()).distinct().forEach(Utilities::successfulTransactionButton);
         SuccessfulPurchaseEvent.emit(player, trade, inputItems, outputItems);
-        if (trade.hasOutput()) {
+        if (trade.hasOutputs()) {
             player.sendMessage(ChatColor.GREEN + "Successful exchange!");
         } else {
             player.sendMessage(ChatColor.GREEN + "Successful donation!");
