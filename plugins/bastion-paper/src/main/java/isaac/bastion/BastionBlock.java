@@ -27,7 +27,8 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
     private Location location;
     private int id = -1;
     private long placed; //time when the bastion block was created
-    private BastionType type;
+    // volatile: the reconciler retypes in place on the main thread while async erosion/regen read it.
+    private volatile BastionType type;
     private volatile Integer listGroupId;
 
     /**
@@ -280,6 +281,16 @@ public class BastionBlock implements QTBox, Comparable<BastionBlock> {
      */
     public BastionType getType() {
         return type;
+    }
+
+    /**
+     * Replaces the bastion's type in place. Only the reconciler calls this, to correct a row whose
+     * stored type drifted from its world block. Safe to mutate live because the TreeSet ordering
+     * ({@link #compareTo}) is location-only, so the object keeps its slot; callers must still update
+     * the spatial index, whose rectangle depends on the type's radius.
+     */
+    public void setType(BastionType type) {
+        this.type = type;
     }
 
     /**
