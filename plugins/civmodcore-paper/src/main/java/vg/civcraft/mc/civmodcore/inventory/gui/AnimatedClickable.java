@@ -3,9 +3,8 @@ package vg.civcraft.mc.civmodcore.inventory.gui;
 import java.util.List;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
-import vg.civcraft.mc.civmodcore.CivModCorePlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
+import vg.civcraft.mc.civmodcore.scheduling.CivTask;
 
 public class AnimatedClickable extends IClickable {
 
@@ -41,12 +40,7 @@ public class AnimatedClickable extends IClickable {
     @Override
     public void addedToInventory(final ClickableInventory inv, final int slot) {
         // Schedule swapping out of item
-        BukkitTask task = new BukkitRunnable() {
-            @Override
-            public void run() {
-                inv.setItem(getNext(), slot);
-            }
-        }.runTaskTimer(CivModCorePlugin.getInstance(), timing, timing);
+        CivTask task = CivScheduler.runGlobalTimer(() -> inv.setItem(getNext(), slot), timing, timing);
         inv.registerTask(task);
     }
 

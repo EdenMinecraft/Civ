@@ -2,12 +2,11 @@ package vg.civcraft.mc.civmodcore.utilities;
 
 import java.util.Collections;
 import java.util.List;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
-import vg.civcraft.mc.civmodcore.CivModCorePlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
 
 public final class DelayedItemDrop {
 
@@ -39,11 +38,14 @@ public final class DelayedItemDrop {
 
     public static void dropAt(final Location l, final List<ItemStack> stacks) {
         // Schedule the item to drop 1 tick later
-        Bukkit.getScheduler().scheduleSyncDelayedTask(CivModCorePlugin.getInstance(), () -> {
+        CivScheduler.runRegionLater(l, () -> {
+            // Location.add mutates in place, so clone once to center the drop without
+            // accumulating the offset per stack or mutating the caller's Location.
+            final Location dropLoc = l.clone().add(0.5, 0.5, 0.5);
             for (ItemStack is : stacks) {
-                l.getWorld().dropItem(l.add(0.5, 0.5, 0.5), is).setVelocity(new Vector(0, 0.05, 0));
+                dropLoc.getWorld().dropItem(dropLoc, is).setVelocity(new Vector(0, 0.05, 0));
             }
-        }, 1);
+        }, 1L);
     }
 
 }

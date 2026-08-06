@@ -17,7 +17,8 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
+import vg.civcraft.mc.civmodcore.scheduling.CivTask;
 
 /**
  * @author caucow ( https://github.com/caucow )
@@ -30,7 +31,7 @@ public class SkinCache {
     // TODO: If an easier way to limit the number of threads spawned by Bukkit's scheduler exists, use it.
     // This is dirty. It feels bad.
     private final ExecutorService executor;
-    private final BukkitTask watchdog;
+    private final CivTask watchdog;
     private Thread watchdogThread;
     /**
      * Caching of PlayerProfiles, should only be accessed directly through
@@ -88,7 +89,7 @@ public class SkinCache {
         // because I don't trust plugins to clean up on disable so might as well
         // have something screeching in the logs. not that many plugins try to
         // be reloadable
-        this.watchdog = Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        this.watchdog = CivScheduler.runAsync(plugin, () -> {
             watchdogThread = Thread.currentThread();
             do {
                 try {
@@ -145,7 +146,7 @@ public class SkinCache {
         metaFuture.thenAccept((asyncMeta) -> {
             if (plugin.isEnabled()) {
                 ItemStack headItem = createHeadItem(asyncMeta);
-                Bukkit.getScheduler().runTask(plugin, () -> notifyAvailable.accept(headItem));
+                CivScheduler.runGlobal(plugin, () -> notifyAvailable.accept(headItem));
             }
         });
         return placeholderSupplier.get();

@@ -2,8 +2,9 @@ package vg.civcraft.mc.civmodcore.utilities.cooldowns;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.bukkit.Bukkit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.bukkit.plugin.java.JavaPlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
 
 /**
  * Cooldown implementation that keeps track of objects in ticks. The value given in the constructor is assumed to be in
@@ -19,25 +20,24 @@ public class TickCoolDownHandler<E> implements ICoolDownHandler<E> {
 
     private long cooldown;
 
-    private long tickCounter;
+    // Incremented on the global region thread but read by cooldown checks on region/entity threads
+    private final AtomicLong tickCounter = new AtomicLong();
 
     public TickCoolDownHandler(JavaPlugin executingPlugin, long cooldown) {
         this.cooldown = cooldown;
         cds = new HashMap<>();
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(executingPlugin, () -> {
-            tickCounter++; // increment every tick
-        }, 1L, 1L);
+        CivScheduler.runGlobalTimer(executingPlugin, tickCounter::incrementAndGet, 1L, 1L);
     }
 
     @Override
     public void putOnCoolDown(E e) {
-        cds.put(e, tickCounter);
+        cds.put(e, tickCounter.get());
     }
 
     @Override
     public boolean onCoolDown(E e) {
         Long lastUsed = cds.get(e);
-        if (lastUsed == null || (tickCounter - lastUsed) > cooldown) {
+        if (lastUsed == null || (tickCounter.get() - lastUsed) > cooldown) {
             return false;
         }
         return true;
@@ -49,7 +49,7 @@ public class TickCoolDownHandler<E> implements ICoolDownHandler<E> {
         if (lastUsed == null) {
             return 0L;
         }
-        long leftOver = tickCounter - lastUsed;
+        long leftOver = tickCounter.get() - lastUsed;
         if (leftOver < cooldown) {
             return cooldown - leftOver;
         }
