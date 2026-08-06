@@ -26,6 +26,18 @@ public interface ExilePearlApi extends Plugin, PearlAccess, PearlLogger, PlayerP
     PearlConfig getPearlConfig();
 
     /**
+     * Gets the effective per-tick decay amount for a pearl, accounting for external modifiers
+     * (e.g. vote-streak multipliers from other plugins) applied via {@link com.devotedmc.ExilePearl.event.PearlDecayEvent}.
+     * <p>
+     * This fires a preview decay event and reads back the resulting amount, so lore and the real
+     * decay loop agree on how fast a pearl actually decays.
+     *
+     * @param pearl The pearl to evaluate
+     * @return The decay amount that would be applied per decay tick, or 0 if decay is cancelled
+     */
+    int getEffectivePearlDecayAmount(ExilePearl pearl);
+
+    /**
      * Gets the pearl lore provider
      *
      * @return The lore provider

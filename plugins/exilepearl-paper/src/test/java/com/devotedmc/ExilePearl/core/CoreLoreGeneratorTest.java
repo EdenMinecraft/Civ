@@ -21,6 +21,7 @@ class CoreLoreGeneratorTest {
     private PearlConfig config;
     private ExilePearl pearl;
     private CoreLoreGenerator generator;
+    private ExilePearlApi api;
     private MockedStatic<ExilePearlPlugin> pluginStatic;
 
     @BeforeEach
@@ -47,8 +48,9 @@ class CoreLoreGeneratorTest {
         Mockito.when(pearl.isActive()).thenReturn(true);
         Mockito.when(pearl.getLongTimeMultiplier()).thenReturn(1.0);
 
-        ExilePearlApi api = Mockito.mock(ExilePearlApi.class);
+        api = Mockito.mock(ExilePearlApi.class);
         Mockito.when(api.isBanStickEnabled()).thenReturn(false);
+        Mockito.when(api.getEffectivePearlDecayAmount(Mockito.any())).thenReturn(1); // base, no streak multiplier
         pluginStatic = Mockito.mockStatic(ExilePearlPlugin.class);
         pluginStatic.when(ExilePearlPlugin::getApi).thenReturn(api);
 
@@ -86,9 +88,20 @@ class CoreLoreGeneratorTest {
 
     @Test
     void generateLore_omitsTimeRemainingWhenDecayDisabled() {
-        Mockito.when(config.getPearlHealthDecayAmount()).thenReturn(0);
+        Mockito.when(api.getEffectivePearlDecayAmount(Mockito.any())).thenReturn(0);
         List<String> lore = generator.generateLore(pearl);
         Assertions.assertNull(findLine(lore, "Time remaining:"), "Decay disabled should hide time remaining; got: " + lore);
+    }
+
+    @Test
+    void generateLore_timeRemainingReflectsStreakMultiplier() {
+        // EssenceGlue doubles decay for a streaked player: 24/day -> 48/day, so 240 health = 5 days, not 10
+        Mockito.when(api.getEffectivePearlDecayAmount(Mockito.any())).thenReturn(2);
+        List<String> lore = generator.generateLore(pearl);
+        String timeRemaining = findLine(lore, "Time remaining:");
+        Assertions.assertNotNull(timeRemaining);
+        Assertions.assertTrue(timeRemaining.contains("5"),
+            "Doubled decay should halve time remaining (240/48 = 5 days), got: " + timeRemaining);
     }
 
     @Test
