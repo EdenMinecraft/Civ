@@ -84,6 +84,8 @@ public class FileHandler {
                     config.set(current + ".runtime", fccf.getRunningTime());
                     config.set(current + ".selectedRecipe", fccf
                         .getCurrentRecipe().getName());
+                    config.set(current + ".preferredRecipe", fccf.getPreferredRecipe() == null
+                        ? null : fccf.getPreferredRecipe().getName());
                     config.set(current + ".autoSelect", fccf.isAutoSelect());
                     List<String> recipeList = new LinkedList<String>();
                     for (IRecipe rec : fccf.getRecipes()) {
@@ -299,6 +301,15 @@ public class FileHandler {
                         }
                     }
                     fac.setAutoSelect(autoSelect);
+                    String preferredRecipe = current.getString("preferredRecipe");
+                    if (preferredRecipe != null) {
+                        for (IRecipe r : fac.getRecipes()) {
+                            if (r.getName().equals(preferredRecipe)) {
+                                fac.setPreferredRecipe(r);
+                                break;
+                            }
+                        }
+                    }
                 {
                     ConfigurationSection iosec = current.getConfigurationSection("furnace-io");
                     if (iosec != null) {

@@ -296,7 +296,7 @@ public class FurnCraftChestInteractionManager implements IInteractionManager {
                     if (fccf.isActive()) {
                         p.sendMessage(ChatColor.RED + "You can't switch recipes while the factory is running");
                     } else {
-                        fccf.setRecipe(recipe);
+                        fccf.setRecipeManually(recipe);
                         p.sendMessage(ChatColor.GREEN + "Switched recipe to " + recipe.getName());
                         ComponableInventory compInv = buildRecipeInventory(p);
                         compInv.update();

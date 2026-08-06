@@ -13,4 +13,7 @@ dependencies {
     compileOnly(project(":plugins:namelayer-paper"))
     compileOnly(project(":plugins:citadel-paper"))
     compileOnly(project(":plugins:heliodor-paper"))
+
+    testImplementation(libs.bundles.junit)
+    testImplementation("org.mockito:mockito-core:5.11.0")
 }
