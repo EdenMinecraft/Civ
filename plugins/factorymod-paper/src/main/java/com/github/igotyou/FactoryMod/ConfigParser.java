@@ -5,7 +5,6 @@ import com.github.igotyou.FactoryMod.eggs.IFactoryEgg;
 import com.github.igotyou.FactoryMod.eggs.PipeEgg;
 import com.github.igotyou.FactoryMod.eggs.SorterEgg;
 import com.github.igotyou.FactoryMod.listeners.NetherPortalListener;
-import com.github.igotyou.FactoryMod.recipes.AOERepairRecipe;
 import com.github.igotyou.FactoryMod.recipes.CompactingRecipe;
 import com.github.igotyou.FactoryMod.recipes.DecompactingRecipe;
 import com.github.igotyou.FactoryMod.recipes.DeterministicEnchantingRecipe;
@@ -647,21 +646,6 @@ public class ConfigParser {
                     result = null;
                 } else {
                     result = new Upgraderecipe(identifier, name, productionTime, input, (FurnCraftChestEgg) egg);
-                }
-                break;
-            case "AOEREPAIR":
-                // This is untested and should not be used for now
-                plugin.warning(
-                    "This recipe is not tested or even completly developed, use it with great care and don't expect it to work");
-                ItemMap tessence = ConfigHelper.parseItemMap(config.getConfigurationSection("essence"));
-                if (tessence.getTotalUniqueItemAmount() > 0) {
-                    ItemStack essence = tessence.getItemStackRepresentation().get(0);
-                    int repPerEssence = config.getInt("repair_per_essence");
-                    int range = config.getInt("range");
-                    result = new AOERepairRecipe(identifier, name, productionTime, essence, range, repPerEssence);
-                } else {
-                    plugin.severe("No essence specified for AOEREPAIR " + config.getCurrentPath());
-                    result = null;
                 }
                 break;
             case "PYLON":
