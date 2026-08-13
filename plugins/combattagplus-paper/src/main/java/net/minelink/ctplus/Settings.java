@@ -337,14 +337,12 @@ public final class Settings {
         return plugin.getConfig().getString("random-name-prefix");
     }
 
-    public String getKillMessage() {
-        String message = plugin.getConfig().getString("kill-message", "");
-        return ChatColor.translateAlternateColorCodes('&', message);
+    public List<String> getKillMessages() {
+        return plugin.getConfig().getStringList("kill-messages");
     }
 
-    public String getKillMessageItem() {
-        String message = plugin.getConfig().getString("kill-message-item", "");
-        return ChatColor.translateAlternateColorCodes('&', message);
+    public List<String> getKillMessagesItem() {
+        return plugin.getConfig().getStringList("kill-messages-item");
     }
 
     public boolean useBarApi() {

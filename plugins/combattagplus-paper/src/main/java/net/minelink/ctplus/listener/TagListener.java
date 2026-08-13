@@ -1,10 +1,16 @@
 package net.minelink.ctplus.listener;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
 import net.minelink.ctplus.CombatTagPlus;
 import net.minelink.ctplus.Tag;
 import net.minelink.ctplus.TagManager;
@@ -279,9 +285,10 @@ public final class TagListener implements Listener {
         if (!SafeLogoutTask.cancel(player)) return;
 
         // Inform player
-        if (!plugin.getSettings().getLogoutCancelledMessage().isEmpty()) {
-            player.sendMessage(plugin.getSettings().getLogoutCancelledMessage());
-        }
+		player.showTitle(Title.title(
+				Component.text("LOGOUT CANCELLED").color(NamedTextColor.DARK_RED).decorate(TextDecoration.BOLD),
+				Component.text("You were PvP tagged").color(NamedTextColor.RED),
+				Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1))));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
