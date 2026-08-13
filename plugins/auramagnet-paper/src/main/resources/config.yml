@@ -1,0 +1,16 @@
+# Radius in blocks to scan for magnetizable items around the player.
+magnet-radius: 10.0
+
+# How much durability is consumed when durability is deducted.
+# If this is 0, the magnet never wears the hoe.
+durability-cost-per-item: 1
+
+# Chance that a collected item consumes durability.
+# 0.0 = never, 1.0 = always. A value like 0.10 means ~10% of collected items
+# will consume durability instead of every single item.
+durability-chance-per-item: 0.05
+
+# The exact lore line the crafting factory places on the hoe.
+# Supports legacy color codes (&6, &l, etc.)
+# Only read on first touch of the item - the scan task itself never reads lore.
+magnet-lore-trigger: "Aura Magnet Hoe"
