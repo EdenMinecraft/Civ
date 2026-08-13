@@ -38,7 +38,8 @@ public class Upgraderecipe extends InputRecipe {
                 fccf.upgrade(e.getName(),
                     e.getRecipes(), e.getFuel(),
                     e.getFuelConsumptionIntervall(), e.getUpdateTime(), e.getMaximumHealth(),
-                    e.getDamagePerDamagingPeriod(), e.getBreakGracePeriod(), e.getCitadelBreakReduction());
+                    e.getDamagePerDamagingPeriod(), e.getBreakGracePeriod(), e.getCitadelBreakReduction(),
+                    e.getDecayIntervallMillis());
             }
         }
         logAfterRecipeRun(combo, fccf);
