@@ -30,6 +30,7 @@ public class WarpFruitListener implements Listener {
         warpFruitTracker.quit(player);
     }
 
+    /*
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         WarpFruitTracker warpFruitTracker = Finale.getPlugin().getManager().getWarpFruitTracker();
@@ -56,6 +57,7 @@ public class WarpFruitListener implements Listener {
             warpFruitTracker.logLocation(player, player.getLocation().add(0, 1, 0));
         });
     }
+     */
 
     private boolean isChorusHolder(Player player) {
         ItemStack mainItem = player.getInventory().getItemInMainHand();

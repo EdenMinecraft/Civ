@@ -82,6 +82,8 @@ public class FinaleManager {
         this.sprintHandler = new SprintHandler();
 
         this.combatHandler = new AsyncPacketHandler(combatConfig);
+
+        this.warpFruitTracker.runTrackingTask();
         ProtocolLibrary.getProtocolManager().addPacketListener(this.combatHandler);
     }
 

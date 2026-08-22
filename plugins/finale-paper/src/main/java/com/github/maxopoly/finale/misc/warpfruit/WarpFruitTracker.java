@@ -7,6 +7,7 @@ import com.github.maxopoly.finale.misc.ally.AllyHandler;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
+import org.bukkit.scheduler.BukkitTask;
 import vg.civcraft.mc.civmodcore.players.scoreboard.bottom.BottomLine;
 import vg.civcraft.mc.civmodcore.players.scoreboard.bottom.BottomLineAPI;
 import vg.civcraft.mc.civmodcore.players.scoreboard.side.CivScoreBoard;
@@ -117,6 +118,22 @@ public class WarpFruitTracker {
     public void logLocation(Player player, Location location) {
         WarpFruitData warpFruitData = getWarpFruitData(player);
         warpFruitData.logLocation(location);
+    }
+
+    public void runTrackingTask() {
+        WarpFruitTracker tracker = this;
+        Bukkit.getScheduler().runTaskTimerAsynchronously(Finale.getPlugin(), new Runnable() {
+            @Override
+            public void run() {
+                Bukkit.getOnlinePlayers().forEach(player -> {
+                    if (player.isInsideVehicle()){
+                        tracker.logLocation(player, player.getLocation().clone().add(0, 1, 0));
+                    }else{
+                        tracker.logLocation(player);
+                    }
+                });
+            }
+        }, 2L, 2L);
     }
 
     private void ring(Player player, Location location) {
