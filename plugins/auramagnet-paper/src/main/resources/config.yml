@@ -5,8 +5,9 @@ magnet-radius: 10.0
 # If this is 0, the magnet never wears the hoe.
 durability-cost-per-item: 1
 
-# Chance that a collected item consumes durability.
-# 0.0 = never, 1.0 = always. A value like 0.10 means ~10% of collected items
+# Chance that an attracted item consumes durability. Rolled once, when the item
+# is first pulled - not on pickup - so swapping the hoe out mid-pull can't dodge it.
+# 0.0 = never, 1.0 = always. A value like 0.10 means ~10% of attracted items
 # will consume durability instead of every single item.
 durability-chance-per-item: 0.05
 

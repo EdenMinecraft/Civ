@@ -32,6 +32,7 @@ public class ItemPullTask extends BukkitRunnable {
     private final Item item;
     private final EquipmentSlot handSlot;
     private int ticksAlive = 0;
+    private boolean durabilityApplied = false;
 
     public ItemPullTask(Player player, Item item, EquipmentSlot handSlot) {
         this.player = player;
@@ -47,6 +48,14 @@ public class ItemPullTask extends BukkitRunnable {
             || !isStillHoldingMagnetHoe() || ticksAlive > MAX_TICKS) {
             cancelAndCleanup();
             return;
+        }
+
+        // Charge durability the moment this item is claimed for attraction, not on
+        // collection - otherwise players yank the hoe to another slot mid-pull to
+        // dodge the cost while still keeping the vacuumed items.
+        if (!durabilityApplied) {
+            durabilityApplied = true;
+            applyDurability();
         }
 
         Location target = player.getLocation().add(0, 1.0, 0);
@@ -93,7 +102,6 @@ public class ItemPullTask extends BukkitRunnable {
 
         item.remove();
         playCollectEffect();
-        applyDurability();
         this.cancel();
     }
 
