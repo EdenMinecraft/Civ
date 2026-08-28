@@ -15,13 +15,15 @@ public class PercentageHealthRepairManager implements IRepairManager {
     private int maximumHealth;
     private int damageAmountPerDecayIntervall;
     private long gracePeriod;
+    private long decayIntervallMillis;
 
-    public PercentageHealthRepairManager(int initialHealth, int maximumHealth, long breakTime, int damageAmountPerDecayIntervall, long gracePeriod) {
+    public PercentageHealthRepairManager(int initialHealth, int maximumHealth, long breakTime, int damageAmountPerDecayIntervall, long gracePeriod, long decayIntervallMillis) {
         this.health = initialHealth;
         this.maximumHealth = maximumHealth;
         this.breakTime = breakTime;
         this.damageAmountPerDecayIntervall = damageAmountPerDecayIntervall;
         this.gracePeriod = gracePeriod;
+        this.decayIntervallMillis = decayIntervallMillis;
     }
 
     public boolean atFullHealth() {
@@ -42,6 +44,22 @@ public class PercentageHealthRepairManager implements IRepairManager {
 
     public boolean inDisrepair() {
         return health <= 0;
+    }
+
+    /**
+     * Projects how long, at the current decay rate, this factory's health has left before it hits 0.
+     * Assumes the decay rate isn't changed again and the server stays online continuously - decay only
+     * ticks while the server is running, so this is a floor rather than a guarantee.
+     *
+     * @return Estimated milliseconds until health reaches 0, or -1 if decay is disabled for this factory
+     * (damageAmountPerDecayIntervall <= 0), since it would then never break from decay.
+     */
+    public long getEstimatedMillisUntilBreak() {
+        if (damageAmountPerDecayIntervall <= 0) {
+            return -1;
+        }
+        long intervalsRemaining = (long) Math.ceil((double) health / damageAmountPerDecayIntervall);
+        return intervalsRemaining * decayIntervallMillis;
     }
 
     public void setFactory(Factory factory) {
