@@ -4,7 +4,7 @@ main: com.github.longboyy.repelshitters.RepelShitters
 author: Longboyy
 description: Makes shitting on people harder
 api-version: 1.21
-depend: [CivModCore, Citadel, NameLayer, Bastion, ExilePearl]
+depend: [CivModCore, Citadel, NameLayer, Bastion]
 commands:
   rsreload: {}
 permissions:

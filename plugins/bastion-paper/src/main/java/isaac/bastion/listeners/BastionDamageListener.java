@@ -57,6 +57,11 @@ public final class BastionDamageListener implements Listener {
         Set<BastionBlock> blocking = blockManager.getBlockingBastionsWithoutPermission(event.getBlock().getLocation(),
             event.getPlayer().getUniqueId(), PermissionType.getPermission(Permissions.BASTION_PLACE));
         for (BastionBlock bastion : blocking) {
+            if(bastion.getLocation().getBlock().getType() == Material.AIR) {
+                bastion.destroy();
+                continue;
+            }
+
             if (!bastion.getType().isOnlyDirectDestruction()) {
                 event.setCancelled(true);
                 if (!Bastion.getSettingManager().getIgnorePlacementMessages(event.getPlayer().getUniqueId())) {

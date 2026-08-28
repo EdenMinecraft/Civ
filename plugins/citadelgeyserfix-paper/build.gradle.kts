@@ -16,5 +16,5 @@ dependencies {
     compileOnly(project(":plugins:civmodcore-paper"))
     compileOnly(project(":plugins:namelayer-paper"))
     compileOnly(project(":plugins:citadel-paper"))
-    compileOnly("org.geysermc.floodgate:api:2.2.4-SNAPSHOT")
+    compileOnly("org.geysermc.floodgate:api:2.2.5-SNAPSHOT")
 }
