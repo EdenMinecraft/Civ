@@ -14,6 +14,7 @@ plugins {
 include(":ansible")
 
 include(":libraries:name-api")
+include(":libraries:banstick-api")
 
 include(":plugins:announcements-velocity")
 include(":plugins:banstick-paper")
@@ -60,3 +61,4 @@ include(":plugins:eve-paper")
 include(":plugins:repelshitters-paper")
 include(":plugins:creativeworlds-paper")
 include(":plugins:shortwave-paper")
+include(":plugins:banstick-velocity")

@@ -2,6 +2,7 @@ package com.programmerdan.minecraft.banstick.data;
 
 import com.programmerdan.minecraft.banstick.BanStick;
 import com.programmerdan.minecraft.banstick.handler.BanStickDatabaseHandler;
+import com.programmerdan.minecraft.banstick.handler.ExclusionHandler;
 import java.lang.ref.WeakReference;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -49,7 +50,6 @@ public final class BSPlayer {
     private transient BSSessions allSessions;
     private transient BSIPs allIPs;
     private transient BSShares allShares;
-    private transient BSExclusions allExclusions;
 
     private BSPlayer() {
     }
@@ -236,9 +236,14 @@ public final class BSPlayer {
      */
     public static void saveDirty() {
         int batchSize = 0;
+        // Note: bid and the pardon timestamps are intentionally excluded here --
+        // banstick-velocity is the sole owner of bs_player.bid/ip_pardon_time/
+        // proxy_pardon_time/shared_pardon_time. Writing them from Paper's
+        // (possibly stale) cached values would clobber whatever banstick-velocity
+        // has authoritatively set.
         try (Connection connection = BanStickDatabaseHandler.getInstanceData().getConnection();
              PreparedStatement savePlayer = connection.prepareStatement(
-                 "UPDATE bs_player SET ip_pardon_time = ?, proxy_pardon_time = ?, shared_pardon_time = ?, bid = ?, name = ? WHERE pid = ?");) {
+                 "UPDATE bs_player SET name = ? WHERE pid = ?");) {
             while (!dirtyPlayers.isEmpty()) {
                 WeakReference<BSPlayer> rplayer = dirtyPlayers.poll();
                 BSPlayer player = rplayer.get();
@@ -283,7 +288,7 @@ public final class BSPlayer {
         this.dirty = false; // don't let anyone else in!
         try (Connection connection = BanStickDatabaseHandler.getInstanceData().getConnection();
              PreparedStatement savePlayer = connection.prepareStatement(
-                 "UPDATE bs_player SET ip_pardon_time = ?, proxy_pardon_time = ?, shared_pardon_time = ?, bid = ?, name = ? WHERE pid = ?");) {
+                 "UPDATE bs_player SET name = ? WHERE pid = ?");) {
             saveToStatement(savePlayer);
             int effects = savePlayer.executeUpdate();
             if (effects == 0) {
@@ -295,32 +300,12 @@ public final class BSPlayer {
     }
 
     private void saveToStatement(PreparedStatement savePlayer) throws SQLException {
-        if (this.ipPardonTime == null) {
-            savePlayer.setNull(1, Types.TIMESTAMP);
-        } else {
-            savePlayer.setTimestamp(1, this.ipPardonTime);
-        }
-        if (this.proxyPardonTime == null) {
-            savePlayer.setNull(2, Types.TIMESTAMP);
-        } else {
-            savePlayer.setTimestamp(2, this.proxyPardonTime);
-        }
-        if (this.sharedPardonTime == null) {
-            savePlayer.setNull(3, Types.TIMESTAMP);
-        } else {
-            savePlayer.setTimestamp(3, this.sharedPardonTime);
-        }
-        if (this.getBan() == null) {
-            savePlayer.setNull(4, Types.BIGINT);
-        } else {
-            savePlayer.setLong(4, this.bid.getId());
-        }
         if (this.name == null) {
-            savePlayer.setNull(5, Types.VARCHAR);
+            savePlayer.setNull(1, Types.VARCHAR);
         } else {
-            savePlayer.setString(5, this.name);
+            savePlayer.setString(1, this.name);
         }
-        savePlayer.setLong(6, this.pid);
+        savePlayer.setLong(2, this.pid);
     }
 
     /**
@@ -365,7 +350,6 @@ public final class BSPlayer {
                         player = new BSPlayer();
                         player.pid = pid;
                         player.allSessions = BSSessions.onlyFor(player);
-                        player.allExclusions = BSExclusions.onlyFor(player);
                         player.allIPs = BSIPs.onlyFor(player);
                         player.allShares = BSShares.onlyFor(player);
                     }
@@ -430,7 +414,6 @@ public final class BSPlayer {
                     player.dirty = false;
                     player.pid = pid;
                     player.allSessions = BSSessions.onlyFor(player);
-                    player.allExclusions = BSExclusions.onlyFor(player);
                     player.allIPs = BSIPs.onlyFor(player);
                     player.allShares = BSShares.onlyFor(player);
                     player.name = rs.getString(2);
@@ -508,7 +491,6 @@ public final class BSPlayer {
             newPlayer.allSessions = BSSessions.onlyFor(newPlayer);
             newPlayer.allIPs = BSIPs.onlyFor(newPlayer);
             newPlayer.allShares = BSShares.onlyFor(newPlayer);
-            newPlayer.allExclusions = BSExclusions.onlyFor(newPlayer);
 
             allPlayersID.put(newPlayer.pid, newPlayer);
             allPlayersUUID.put(newPlayer.uuid, newPlayer);
@@ -571,7 +553,6 @@ public final class BSPlayer {
             newPlayer.allSessions = BSSessions.onlyFor(newPlayer);
             newPlayer.allIPs = BSIPs.onlyFor(newPlayer);
             newPlayer.allShares = BSShares.onlyFor(newPlayer);
-            newPlayer.allExclusions = BSExclusions.onlyFor(newPlayer);
 
             allPlayersID.put(newPlayer.pid, newPlayer);
             allPlayersUUID.put(newPlayer.uuid, newPlayer);
@@ -640,7 +621,6 @@ public final class BSPlayer {
                     player.allSessions = BSSessions.onlyFor(player);
                     player.allIPs = BSIPs.onlyFor(player);
                     player.allShares = BSShares.onlyFor(player);
-                    player.allExclusions = BSExclusions.onlyFor(player);
 
                     if (!allPlayersID.containsKey(player.pid)) {
                         allPlayersID.put(player.pid, player);
@@ -734,11 +714,11 @@ public final class BSPlayer {
                 continue;
             }
             if (!alts.contains(share.getFirstPlayer())
-                && !(respectExclusions && allExclusions.hasExclusionWith(share.getFirstPlayer()))) {
+                && !(respectExclusions && ExclusionHandler.hasExclusionWith(this.uuid, share.getFirstPlayer().getUUID()))) {
                 share.getFirstPlayer().getTransitiveSharedPlayersRecursive(alts, respectExclusions);
             }
             if (!alts.contains(share.getSecondPlayer())
-                && !(respectExclusions && allExclusions.hasExclusionWith(share.getSecondPlayer()))) {
+                && !(respectExclusions && ExclusionHandler.hasExclusionWith(this.uuid, share.getSecondPlayer().getUUID()))) {
                 share.getSecondPlayer().getTransitiveSharedPlayersRecursive(alts, respectExclusions);
             }
         }
@@ -751,18 +731,6 @@ public final class BSPlayer {
 
     public void addShare(BSShare share, BSPlayer player) {
         this.allShares.addNew(share, player);
-    }
-
-    public void addExclusion(BSExclusion excl) {
-        this.allExclusions.addNew(excl);
-    }
-
-    public void removeExclusion(BSExclusion excl) {
-        this.allExclusions.remove(excl);
-    }
-
-    public BSExclusion getExclusionWith(BSPlayer player) {
-        return allExclusions.getExclusionWith(player);
     }
 
     @Override

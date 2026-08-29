@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-version = "2.0.1"
+version = "3.0.0"
 
 dependencies {
     paperweight {
@@ -15,4 +15,6 @@ dependencies {
 
     implementation(libs.ipaddress)
     implementation(libs.jsoup)
+    implementation(libs.redis.jedis)
+    implementation(project(":libraries:banstick-api"))
 }

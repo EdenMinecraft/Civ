@@ -1,8 +1,10 @@
 package com.programmerdan.minecraft.banstick;
 
+import com.programmerdan.minecraft.banstick.commands.BanStickCommandManager;
 import com.programmerdan.minecraft.banstick.data.BSLog;
 import com.programmerdan.minecraft.banstick.data.BSRegistrars;
-import com.programmerdan.minecraft.banstick.handler.BanStickCommandHandler;
+import com.programmerdan.minecraft.banstick.handler.BanHandler;
+import com.programmerdan.minecraft.banstick.handler.ExclusionHandler;
 import com.programmerdan.minecraft.banstick.handler.BanStickDatabaseHandler;
 import com.programmerdan.minecraft.banstick.handler.BanStickEventHandler;
 import com.programmerdan.minecraft.banstick.handler.BanStickIPDataHandler;
@@ -11,14 +13,14 @@ import com.programmerdan.minecraft.banstick.handler.BanStickImportHandler;
 import com.programmerdan.minecraft.banstick.handler.BanStickProxyHandler;
 import com.programmerdan.minecraft.banstick.handler.BanStickScrapeHandler;
 import com.programmerdan.minecraft.banstick.handler.BanStickTorUpdater;
+import com.programmerdan.minecraft.banstick.redis.BanStickRedisClient;
 import vg.civcraft.mc.civmodcore.ACivMod;
 
 public class BanStick extends ACivMod {
 
     private static BanStick instance;
 
-    @SuppressWarnings("unused")
-    private BanStickCommandHandler commandHandler;
+    private BanStickCommandManager commandManager;
     private BanStickEventHandler eventHandler;
     private BanStickDatabaseHandler databaseHandler;
     private BanStickTorUpdater torUpdater;
@@ -29,6 +31,7 @@ public class BanStick extends ACivMod {
     private BanStickImportHandler importHandler;
     private BSLog logHandler;
     private BSRegistrars bannedRegistrars;
+    private BanStickRedisClient redisClient;
 
     private boolean slaveMode;
 
@@ -46,6 +49,11 @@ public class BanStick extends ACivMod {
 
         if (getConfig().getBoolean("slaveMode", false)) {
             this.slaveMode = true;
+        }
+
+        registerRedisHandler();
+        if (!isEnabled()) {
+            return;
         }
 
         registerEventHandler();
@@ -89,6 +97,12 @@ public class BanStick extends ACivMod {
         if (this.databaseHandler != null) {
             this.databaseHandler.doShutdown();
         }
+        if (this.redisClient != null) {
+            this.redisClient.shutdown();
+        }
+        if (this.commandManager != null) {
+            this.commandManager.reset();
+        }
 
         super.onDisable();
     }
@@ -114,12 +128,31 @@ public class BanStick extends ACivMod {
         return this.eventHandler;
     }
 
+    private void registerRedisHandler() {
+        if (!isEnabled()) {
+            return;
+        }
+        try {
+            this.redisClient = new BanStickRedisClient(getConfig());
+            BanHandler.setRedisClient(this.redisClient);
+            ExclusionHandler.setRedisClient(this.redisClient);
+        } catch (Exception e) {
+            severe("Failed to set up Redis connection to banstick-velocity", e);
+            setEnabled(false);
+        }
+    }
+
+    public BanStickRedisClient getRedisHandler() {
+        return this.redisClient;
+    }
+
     private void registerCommandHandler() {
         if (!isEnabled()) {
             return;
         }
         try {
-            this.commandHandler = new BanStickCommandHandler(getConfig());
+            this.commandManager = new BanStickCommandManager(this);
+            this.commandManager.init();
         } catch (Exception e) {
             severe("Failed to set up command handling", e);
             setEnabled(false);

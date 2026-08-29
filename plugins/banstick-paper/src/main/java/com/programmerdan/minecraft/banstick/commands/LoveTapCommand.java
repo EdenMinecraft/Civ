@@ -1,6 +1,17 @@
 package com.programmerdan.minecraft.banstick.commands;
 
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.InvalidCommandArgument;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Syntax;
 import com.programmerdan.minecraft.banstick.BanStick;
+import com.programmerdan.minecraft.banstick.commands.context.BanStickContexts;
+import com.programmerdan.minecraft.banstick.commands.context.BanTarget;
+import com.programmerdan.minecraft.banstick.handler.BanHandler;
 import com.programmerdan.minecraft.banstick.data.BSBan;
 import com.programmerdan.minecraft.banstick.data.BSIP;
 import com.programmerdan.minecraft.banstick.data.BSIPData;
@@ -8,66 +19,53 @@ import com.programmerdan.minecraft.banstick.data.BSPlayer;
 import com.programmerdan.minecraft.banstick.data.BSSession;
 import com.programmerdan.minecraft.banstick.data.BSShare;
 import inet.ipaddr.IPAddress;
-import inet.ipaddr.IPAddressString;
-import inet.ipaddr.IPAddressStringException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import vg.civcraft.mc.namelayer.NameLayerAPI;
 
 /**
  * Sometimes you need some love, so lovetap
  *
  * @author <a href="mailto:programmerdan@gmail.com">ProgrammerDan</a>
  */
-public class LoveTapCommand implements CommandExecutor {
+@CommandAlias("lovetap|bstl")
+@CommandPermission("banstick.lovetap")
+public class LoveTapCommand extends BaseCommand {
 
-    public static String name = "lovetap";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String cmdString, String[] arguments) {
-        if (arguments.length < 1) {
-            return false;
-        }
-
-        String preTap = arguments[0];
-        int locCIDR = preTap.indexOf('/');
-        Boolean hasCIDR = locCIDR > -1;
-        Integer cidr = (hasCIDR) ? Integer.valueOf(preTap.substring(locCIDR + 1)) : null;
-        String toTap = (hasCIDR) ? preTap.substring(0, locCIDR) : preTap;
+    @Default
+    @Syntax("<ip[/cidr]|name/uuid[/cidr]> [number of sessions]")
+    @Description("Investigate a user / show history / log information. Also give banstick.ips to show IP info during check.")
+    @CommandCompletion("@banstickPlayers")
+    public void onLoveTap(CommandSender sender, BanTarget target, String[] rest) {
         Integer sessionLimit = Integer.MAX_VALUE;
-        try {
-            sessionLimit = Integer.valueOf(arguments[1]);
-        } catch (NumberFormatException | ArrayIndexOutOfBoundsException ex) {
-            sender.sendMessage(ChatColor.RED + "You didn't enter a number of sessions properly, defaulting to all");
+        if (rest.length >= 1) {
+            try {
+                sessionLimit = Integer.valueOf(rest[0]);
+            } catch (NumberFormatException ex) {
+                sender.sendMessage(ChatColor.RED + "You didn't enter a number of sessions properly, defaulting to all");
+            }
         }
 
-        BanStick.getPlugin().debug("preTap: {0}, CIDR? {1}, toTap: {2}",
-            preTap, cidr, toTap);
+        BanStick.getPlugin().debug("target: {0}", target);
 
-        try {
-            IPAddress ipcheck = new IPAddressString(toTap).toAddress();
-            if (ipcheck == null) {
-                throw new IPAddressStringException("Null -- but no error?");
-            }
+        if (target.isIp()) {
             if (!sender.hasPermission("banstick.ips")) {
-                sender.sendMessage(ChatColor.RED + "You don't have permission to use / view IPs");
-                return true;
+                throw new InvalidCommandArgument("You don't have permission to use / view IPs", false);
             }
-            if (hasCIDR) { // MOAR, but aggregates.
+
+            IPAddress ipcheck = target.getIp();
+            Integer cidr = target.getCidr();
+            if (target.hasCidr()) { // MOAR, but aggregates.
                 sender.sendMessage(ChatColor.GREEN + "Please wait, searching for all contained IP records");
                 Bukkit.getScheduler().runTaskAsynchronously(BanStick.getPlugin(), new Runnable() {
                     @Override
@@ -108,8 +106,6 @@ public class LoveTapCommand implements CommandExecutor {
                                 ipStr.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
                                     "/lovetap " + bsip.toString()));
                                 ipBase.addExtra(ipStr);
-                                // TODO: Add a hover and clickable that issues a lovetap for this IP specifically.
-                                //sb.append(ChatColor.BLUE).append("IP ").append(ChatColor.WHITE).append(bsip.toString()).toString());
 
                                 TextComponent ipBanBase = new TextComponent(" IPBans: ");
                                 ipBanBase.setColor(net.md_5.bungee.api.ChatColor.AQUA);
@@ -118,7 +114,6 @@ public class LoveTapCommand implements CommandExecutor {
                                 ipBanStr.setColor(net.md_5.bungee.api.ChatColor.WHITE);
                                 ipBanBase.addExtra(ipBanStr);
                                 ipBase.addExtra(ipBanBase);
-                                //sb.append(ChatColor.AQUA).append(" IPBans: ").append(ChatColor.WHITE).append(bans == null ? 0 : bans.size());
 
                                 TextComponent sessionBase = new TextComponent(" Sessions: ");
                                 sessionBase.setColor(net.md_5.bungee.api.ChatColor.AQUA);
@@ -127,9 +122,7 @@ public class LoveTapCommand implements CommandExecutor {
                                 sessionStr.setColor(net.md_5.bungee.api.ChatColor.WHITE);
                                 sessionBase.addExtra(sessionStr);
                                 ipBase.addExtra(sessionBase);
-                                //sb.append(ChatColor.AQUA).append(" Sessions: ").append(ChatColor.WHITE).append(sessions == null ? 0 : sessions.size());
 
-                                // TODO: Add a hover showing all the player's names
                                 TextComponent playerBase = new TextComponent(" Players: ");
                                 playerBase.setColor(net.md_5.bungee.api.ChatColor.AQUA);
                                 TextComponent playerStr = new TextComponent(Integer.toString(players == null ? 0
@@ -141,7 +134,6 @@ public class LoveTapCommand implements CommandExecutor {
                                 }
                                 playerBase.addExtra(playerStr);
                                 ipBase.addExtra(playerBase);
-                                //sb.append(ChatColor.AQUA).append(" Players: ").append(ChatColor.WHITE).append(players == null ? 0 : players.size());
 
                                 TextComponent plBanBase = new TextComponent(" PlayerBans: ");
                                 plBanBase.setColor(net.md_5.bungee.api.ChatColor.AQUA);
@@ -154,7 +146,6 @@ public class LoveTapCommand implements CommandExecutor {
                                 }
                                 plBanBase.addExtra(plBanStr);
                                 ipBase.addExtra(plBanBase);
-                                //sb.append(ChatColor.AQUA).append(" PlayerBans: ").append(ChatColor.WHITE).append(playerBans == null ? 0 : playerBans.size());
 
                                 if (proxy != null) {
                                     TextComponent proxyBase = new TextComponent("\n   " + proxy.toString());
@@ -167,14 +158,12 @@ public class LoveTapCommand implements CommandExecutor {
                                             + proxy.getCity() + "\""));
                                     ipBase.addExtra(proxyBase);
                                 }
-                                //if (proxy != null) sb.append("\n   ").append(proxy.toString());
 
                                 if (sender instanceof Player) {
                                     ((Player) sender).spigot().sendMessage(ipBase);
                                 } else {
                                     sender.sendMessage(ipBase.toLegacyText());
                                 }
-                                //sender.sendMessage(sb.toString());
                             }
                         } else {
                             sender.sendMessage(ChatColor.RED + "No IPs found contained by "
@@ -185,11 +174,11 @@ public class LoveTapCommand implements CommandExecutor {
             }
             // LESS, but details
 
-            BSIP exact = !hasCIDR ? BSIP.byIPAddress(ipcheck) : BSIP.byCIDR(ipcheck.toString(), cidr);
+            BSIP exact = !target.hasCidr() ? BSIP.byIPAddress(ipcheck) : BSIP.byCIDR(ipcheck.toString(), cidr);
             if (exact == null) {
-                sender.sendMessage(ChatColor.RED + "Can't find exact " + (hasCIDR ? ipcheck.toString()
+                sender.sendMessage(ChatColor.RED + "Can't find exact " + (target.hasCidr() ? ipcheck.toString()
                     + "/" + cidr : ipcheck.toString()));
-                return true;
+                return;
             }
 
             List<BSBan> bans = BSBan.byIP(exact, false);
@@ -232,147 +221,119 @@ public class LoveTapCommand implements CommandExecutor {
                 }
             }
             sender.sendMessage(sb.toString());
-
-            return true;
-        } catch (IPAddressStringException e) {
-            // Not an IP address!
-            UUID playerId = null;
-            if (toTap.length() <= 16) {
-                try {
-                    playerId = null;
-                    try {
-                        playerId = NameLayerAPI.getUUID(toTap);
-                    } catch (NoClassDefFoundError ncde) {
-                    }
-
-                    if (playerId == null) {
-                        Player match = Bukkit.getPlayer(toTap);
-                        if (match != null) {
-                            playerId = match.getUniqueId();
-                        }
-                    }
-                } catch (Exception ee) {
-                    sender.sendMessage(ChatColor.RED + "Unable to find player " + ChatColor.DARK_RED + toTap);
-                }
-            } else if (toTap.length() == 36) {
-                try {
-                    playerId = UUID.fromString(toTap);
-                } catch (IllegalArgumentException iae) {
-                    sender.sendMessage(ChatColor.RED + "Unable to process uuid " + ChatColor.DARK_RED + toTap);
-                }
-            } else {
-                sender.sendMessage(ChatColor.RED + "Unable to interpret " + ChatColor.DARK_RED + toTap);
+        } else {
+            BSPlayer player = BSPlayer.byUUID(target.getPlayerId());
+            if (player == null) {
+                sender.sendMessage("No Player records for " + target.getPlayerId());
+                return;
             }
 
-            if (playerId != null) {
-                BSPlayer player = BSPlayer.byUUID(playerId);
-                if (player == null) {
-                    sender.sendMessage("No Player records for " + toTap);
+            if (target.hasCidr()) {
+                if (!sender.hasPermission("banstick.ips")) {
+                    throw new InvalidCommandArgument("You don't have permission to use / view IPs", false);
                 }
 
-                if (hasCIDR) {
-                    if (!sender.hasPermission("banstick.ips")) {
-                        sender.sendMessage(ChatColor.RED + "You don't have permission to use / view IPs");
-                        return true;
-                    }
-
-                    BSSession latest = player.getLatestSession();
-                    if (latest != null) {
-                        BSIP latestIP = latest.getIP();
-                        if (latestIP == null) {
-                            sender.sendMessage("CIDR " + cidr + " of latest IP requested but player has no latest IP");
-                            return true;
-                        }
-                        String ipRequest = latestIP.toString();
-                        if (ipRequest.indexOf('/') > -1) {
-                            ipRequest = ipRequest.substring(0, ipRequest.indexOf('/'));
-                        }
-                        return onCommand(sender, cmd, cmdString, new String[]{ipRequest + "/" + cidr});
-                    }
-                }
-
-                BSBan ban = player.getBan();
-                List<BSSession> history = player.getAllSessions();
                 BSSession latest = player.getLatestSession();
-
-                BSIPData latestProxy = latest != null ? BSIPData.byContainsIP(latest.getIP()) : null;
-
-                List<BSShare> shares = player.getAllShares();
-
-                StringBuilder sb = new StringBuilder();
-                if (history != null) {
-                    Collections.reverse(history);
-                    sb.append(ChatColor.BLUE).append("Session History: ").append(ChatColor.DARK_AQUA)
-                        .append("(First Join: ").append(ChatColor.WHITE).append(player.getFirstAdd())
-                        .append(ChatColor.DARK_AQUA).append(")\n");
-                    for (int i = 0; i <= sessionLimit - 1; i++) {
-                        try {
-                            sb.append(ChatColor.WHITE + "  " + history.get(i).toFullString(
-                                sender.hasPermission("banstick.ips")) + "\n");
-                        } catch (IndexOutOfBoundsException exception) {
-                            break;
-                        }
-                    }
-                    sb.append("\n");
-                }
                 if (latest != null) {
-                    sb.append(ChatColor.GREEN + "Most Recent Session: \n");
-                    sb.append(ChatColor.WHITE + "  " + latest.toFullString(
-                        sender.hasPermission("banstick.ips")) + "\n");
-                }
-
-                if (shares != null && !shares.isEmpty()) {
-                    sb.append(ChatColor.BLUE).append("Share History: ").append("\n");
-                    for (BSShare histShare : shares) {
-                        sb.append(ChatColor.WHITE + "  "
-                            + histShare.toFullString(sender.hasPermission("banstick.ips")) + "\n");
+                    BSIP latestIP = latest.getIP();
+                    if (latestIP == null) {
+                        sender.sendMessage("CIDR " + target.getCidr()
+                            + " of latest IP requested but player has no latest IP");
+                        return;
                     }
-                    sb.append("\n");
+                    String ipRequest = latestIP.toString();
+                    if (ipRequest.indexOf('/') > -1) {
+                        ipRequest = ipRequest.substring(0, ipRequest.indexOf('/'));
+                    }
+                    BanTarget resolved = BanStickContexts.parseBanTarget(ipRequest + "/" + target.getCidr());
+                    onLoveTap(sender, resolved, rest);
+                    return;
                 }
+            }
 
-                if (latestProxy != null && sender.hasPermission("banstick.ips")) {
-                    sb.append(ChatColor.GRAY + "  Network: " + ChatColor.WHITE + latestProxy.toString() + "\n");
+            // Fresh, Redis-backed status -- Paper's local BSPlayer.getBan() is
+            // never updated after a ban/unban since banstick-velocity is the
+            // sole writer now, so it can't be trusted for display here either.
+            BanHandler.PlayerStatus status = BanHandler.getPlayerStatus(player.getUUID());
+            List<BSSession> history = player.getAllSessions();
+            BSSession latest = player.getLatestSession();
+
+            BSIPData latestProxy = latest != null ? BSIPData.byContainsIP(latest.getIP()) : null;
+
+            List<BSShare> shares = player.getAllShares();
+
+            StringBuilder sb = new StringBuilder();
+            if (history != null) {
+                Collections.reverse(history);
+                sb.append(ChatColor.BLUE).append("Session History: ").append(ChatColor.DARK_AQUA)
+                    .append("(First Join: ").append(ChatColor.WHITE).append(player.getFirstAdd())
+                    .append(ChatColor.DARK_AQUA).append(")\n");
+                for (int i = 0; i <= sessionLimit - 1; i++) {
+                    try {
+                        sb.append(ChatColor.WHITE + "  " + history.get(i).toFullString(
+                            sender.hasPermission("banstick.ips")) + "\n");
+                    } catch (IndexOutOfBoundsException exception) {
+                        break;
+                    }
                 }
                 sb.append("\n");
-                if (ban != null) {
-                    sb.append(ChatColor.RED + "Active Ban: \n");
-                    sb.append(ChatColor.WHITE + "  " + ban.toString() + "\n");
+            }
+            if (latest != null) {
+                sb.append(ChatColor.GREEN + "Most Recent Session: \n");
+                sb.append(ChatColor.WHITE + "  " + latest.toFullString(
+                    sender.hasPermission("banstick.ips")) + "\n");
+            }
+
+            if (shares != null && !shares.isEmpty()) {
+                sb.append(ChatColor.BLUE).append("Share History: ").append("\n");
+                for (BSShare histShare : shares) {
+                    sb.append(ChatColor.WHITE + "  "
+                        + histShare.toFullString(sender.hasPermission("banstick.ips")) + "\n");
                 }
                 sb.append("\n");
-                sb.append(ChatColor.GREEN + "Pardoned from future:\n");
-                if (player.getIPPardonTime() != null) {
-                    sb.append(ChatColor.GREEN + "  IP Bans\n");
-                }
-                if (player.getProxyPardonTime() != null) {
-                    sb.append(ChatColor.GREEN + "  Proxy Bans\n");
-                }
-                if (player.getSharedPardonTime() != null) {
-                    sb.append(ChatColor.GREEN + "  Shared Connection Bans\n");
-                }
-                if (player.getIPPardonTime() == null && player.getProxyPardonTime() == null
-                    && player.getSharedPardonTime() == null) {
-                    sb.append(ChatColor.RED + "  Nothing\n");
-                }
+            }
 
+            if (latestProxy != null && sender.hasPermission("banstick.ips")) {
+                sb.append(ChatColor.GRAY + "  Network: " + ChatColor.WHITE + latestProxy.toString() + "\n");
+            }
+            sb.append("\n");
+            if (status.banned()) {
+                sb.append(ChatColor.RED + "Active Ban: \n");
+                sb.append(ChatColor.WHITE + "  " + status.banMessage());
+                sb.append(status.banEnd() != null ? " - Until " + status.banEnd() : " - Forever");
+                if (status.adminBan()) {
+                    sb.append(" (administrative)");
+                }
                 sb.append("\n");
-                sb.append(ChatColor.WHITE + player.getName() + " [" + player.getUUID() + "]");
+            }
+            sb.append("\n");
+            sb.append(ChatColor.GREEN + "Pardoned from future:\n");
+            if (status.ipPardonTime() != null) {
+                sb.append(ChatColor.GREEN + "  IP Bans\n");
+            }
+            if (status.proxyPardonTime() != null) {
+                sb.append(ChatColor.GREEN + "  Proxy Bans\n");
+            }
+            if (status.sharedPardonTime() != null) {
+                sb.append(ChatColor.GREEN + "  Shared Connection Bans\n");
+            }
+            if (status.ipPardonTime() == null && status.proxyPardonTime() == null
+                && status.sharedPardonTime() == null) {
+                sb.append(ChatColor.RED + "  Nothing\n");
+            }
 
-                sender.sendMessage(sb.toString());
-                if (latestProxy != null && sender instanceof Player) {
-                    TextComponent proxyBase = new TextComponent("\n   View other players in same city");
-                    proxyBase.setColor(net.md_5.bungee.api.ChatColor.GOLD);
-                    proxyBase.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                        "/drilldown PLAYER country \"" + latestProxy.getCountry() + "\" region \""
-                            + latestProxy.getRegion() + "\" city \"" + latestProxy.getCity() + "\""));
-                    ((Player) sender).spigot().sendMessage(proxyBase);
-                }
+            sb.append("\n");
+            sb.append(ChatColor.WHITE + player.getName() + " [" + player.getUUID() + "]");
 
-                return true;
-            } else {
-                sender.sendMessage(ChatColor.RED + "Unable to find " + ChatColor.DARK_RED + toTap);
+            sender.sendMessage(sb.toString());
+            if (latestProxy != null && sender instanceof Player) {
+                TextComponent proxyBase = new TextComponent("\n   View other players in same city");
+                proxyBase.setColor(net.md_5.bungee.api.ChatColor.GOLD);
+                proxyBase.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                    "/drilldown PLAYER country \"" + latestProxy.getCountry() + "\" region \""
+                        + latestProxy.getRegion() + "\" city \"" + latestProxy.getCity() + "\""));
+                ((Player) sender).spigot().sendMessage(proxyBase);
             }
         }
-
-        return false;
     }
 }

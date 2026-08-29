@@ -3,10 +3,12 @@ package com.programmerdan.minecraft.banstick.containers;
 import com.programmerdan.minecraft.banstick.data.BSBan;
 import com.programmerdan.minecraft.banstick.data.BSIP;
 import com.programmerdan.minecraft.banstick.data.BSIPData;
-import com.programmerdan.minecraft.banstick.data.BSPlayer;
 import com.programmerdan.minecraft.banstick.data.BSShare;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.bukkit.command.CommandSender;
 
@@ -14,15 +16,27 @@ import org.bukkit.command.CommandSender;
  * Used to store bans issued and then transmit the results to various parties.
  * Basically a logic wrapper.
  *
+ * <p>Direct player bans are enacted by banstick-velocity (see
+ * {@link com.programmerdan.minecraft.banstick.handler.BanHandler}), so this class
+ * only carries the display summary of what was banned rather than a live
+ * {@code BSPlayer}/{@code BSBan} pair for that case.
+ *
  * @author <a href="mailto:programmerdan@gmail.com">ProgrammerDan</a>
  */
 public class BanResult {
 
-    private Set<BSPlayer> playerBans;
+    /**
+     * Display summary of one direct player ban that was successfully forwarded to
+     * banstick-velocity.
+     */
+    public record PlayerBanSummary(String playerName, String message, Date banEnd) {
+    }
+
+    private List<PlayerBanSummary> playerBans;
     private Set<BSBan> bans;
 
     public BanResult() {
-        playerBans = new HashSet<>();
+        playerBans = new ArrayList<>();
         bans = new HashSet<>();
     }
 
@@ -43,11 +57,10 @@ public class BanResult {
         if (playerBans.size() > 1) {
             sb.append(playerBans.size()).append(" player bans issued.\n");
         }
-        for (BSPlayer banned : playerBans) {
-            BSBan ban = banned.getBan();
-            sb.append(" Banned ").append(banned.getName()).append(" for ").append(ban.getMessage());
-            if (ban.getBanEndTime() != null) {
-                sb.append(" until ").append(getUsualDateTime().format(ban.getBanEndTime())).append("\n");
+        for (PlayerBanSummary banned : playerBans) {
+            sb.append(" Banned ").append(banned.playerName()).append(" for ").append(banned.message());
+            if (banned.banEnd() != null) {
+                sb.append(" until ").append(getUsualDateTime().format(banned.banEnd())).append("\n");
             } else {
                 sb.append(" forever\n");
             }
@@ -78,8 +91,8 @@ public class BanResult {
         sender.sendMessage(sb.toString());
     }
 
-    public void addPlayer(BSPlayer player) {
-        playerBans.add(player);
+    public void addPlayerBan(String playerName, String message, Date banEnd) {
+        playerBans.add(new PlayerBanSummary(playerName, message, banEnd));
     }
 
     public void addBan(BSBan ban) {

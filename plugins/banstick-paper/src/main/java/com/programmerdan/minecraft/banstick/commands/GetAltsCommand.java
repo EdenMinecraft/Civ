@@ -1,11 +1,15 @@
 package com.programmerdan.minecraft.banstick.commands;
 
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Syntax;
 import com.programmerdan.minecraft.banstick.data.BSPlayer;
 import java.util.Set;
-import java.util.UUID;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
 /**
@@ -13,27 +17,15 @@ import org.bukkit.command.CommandSender;
  *
  * @author Maxopoly
  */
-public class GetAltsCommand implements CommandExecutor {
+@CommandAlias("getalts")
+@CommandPermission("banstick.alts.view")
+public class GetAltsCommand extends BaseCommand {
 
-    public static String name = "getalts";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length != 1) {
-            sender.sendMessage(ChatColor.RED + "You must specify a single player name or uuid");
-            return false;
-        }
-        UUID uuid = UntangleCommand.resolveName(args[0]);
-        if (uuid == null) {
-            sender.sendMessage(ChatColor.RED + "Could not parse player: " + args[0]);
-            return false;
-        }
-        BSPlayer player = BSPlayer.byUUID(uuid);
-        if (player == null) {
-            sender.sendMessage(ChatColor.RED + "Player with uuid is not known: " + uuid.toString());
-            return false;
-        }
-
+    @Default
+    @Syntax("<name/uuid>")
+    @Description("Gets alts for a player")
+    @CommandCompletion("@banstickPlayers")
+    public void onGetAlts(CommandSender sender, BSPlayer player) {
         Set<BSPlayer> directAssoc = player.getTransitiveSharedPlayers(true);
         StringBuilder sb = new StringBuilder();
         sb.append(ChatColor.GOLD + "Directly associated accounts for " + player.getName() + " are: ");
@@ -54,7 +46,6 @@ public class GetAltsCommand implements CommandExecutor {
             sb.append("  ");
         }
         sender.sendMessage(sb.toString());
-        return true;
     }
 
 }

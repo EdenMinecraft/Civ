@@ -1,5 +1,13 @@
 package com.programmerdan.minecraft.banstick.commands;
 
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.InvalidCommandArgument;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Syntax;
 import com.programmerdan.minecraft.banstick.BanStick;
 import com.programmerdan.minecraft.banstick.data.BSIP;
 import com.programmerdan.minecraft.banstick.data.BSIPData;
@@ -22,8 +30,6 @@ import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -32,7 +38,9 @@ import org.bukkit.entity.Player;
  *
  * @author <a href="mailto:programmerdan@gmail.com">ProgrammerDan</a>
  */
-public class DrillDownCommand implements CommandExecutor {
+@CommandAlias("drilldown|bsdd|deepdive")
+@CommandPermission("banstick.lovetap")
+public class DrillDownCommand extends BaseCommand {
 
     public enum Action {
         PLAYER,
@@ -59,22 +67,23 @@ public class DrillDownCommand implements CommandExecutor {
         }
     }
 
-    public static String name = "drilldown";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String cmdString, String[] arguments) {
-        if (arguments.length < 3) {
-            return false;
+    @Default
+    @Syntax("<SUMMARY|PLAYER|IP|IPDATA|IPDATASUMMARY> [[CONTINENT|COUNTRY|REGION|STATE|CITY|POSTAL|ZIP|DOMAIN|PROVIDER|REGISTEREDAS|CONNECTION] \"value\"]x3")
+    @Description("Investigate the IPs and IP Networks based on specific values (like, find all networks in China)")
+    @CommandCompletion("@drillDownActions @ipDataAttributes")
+    public void onDrillDown(CommandSender sender, Action action, String[] rest) {
+        if (rest.length < 2) {
+            throw new InvalidCommandArgument();
         }
-		
+
 		/*
-		 * /drilldown [SUMMARY|PLAYER|IP|IPDATA|IPDATASUMMARY] 
-		 *    [[CONTINENT|COUNTRY|REGION|STATE|CITY|POSTAL|ZIP|DOMAIN|PROVIDER|REGISTEREDAS|CONNECTION] 
+		 * /drilldown [SUMMARY|PLAYER|IP|IPDATA|IPDATASUMMARY]
+		 *    [[CONTINENT|COUNTRY|REGION|STATE|CITY|POSTAL|ZIP|DOMAIN|PROVIDER|REGISTEREDAS|CONNECTION]
 		 *    "value"]x3
 		 * up to three of the above; unpaginated, so this could get very long
-		 * 
-		 * 
-					" continent TEXT," + 
+		 *
+		 *
+					" continent TEXT," +
 					" country TEXT," +
 					" region TEXT," +
 					" city TEXT," +
@@ -87,25 +96,15 @@ public class DrillDownCommand implements CommandExecutor {
 					" connection TEXT," +
 					" proxy FLOAT," +
 					" source TEXT," +
-					" comment TEXT," + 
+					" comment TEXT," +
 
 		 */
 
-        //int page = 0;
-        //int perpage = 20;
         ArrayList<String> values = new ArrayList<>();
         StringBuilder nextValue = new StringBuilder();
-        //boolean hasPage = false;
         boolean foundAnchor = false;
-        Action preaction = Action.SUMMARY;
-        try {
-            preaction = Action.match(arguments[0]);
-        } catch (IllegalArgumentException iae) {
-            return false;
-        }
-        final Action action = preaction;
 
-        for (String arg : Arrays.copyOfRange(arguments, 1, arguments.length)) {
+        for (String arg : rest) {
             String toAdd = null;
             if (arg.equals("continent")) {
                 if (foundAnchor) {
@@ -178,7 +177,8 @@ public class DrillDownCommand implements CommandExecutor {
             }
         }
         if (values.isEmpty()) {
-            return false;
+            sender.sendMessage(ChatColor.RED + "You must specify at least one attribute and value to search by.");
+            return;
         }
         if (foundAnchor) {
             values.add(nextValue.toString());
@@ -292,8 +292,8 @@ public class DrillDownCommand implements CommandExecutor {
                     }
                     if (Action.SUMMARY.equals(action)) {
                         StringBuilder sb = new StringBuilder();
-                        for (int i = 1; i < arguments.length; i++) {
-                            sb.append(" ").append(arguments[i]);
+                        for (String r : rest) {
+                            sb.append(" ").append(r);
                         }
                         TextComponent summary = new TextComponent("Found ");
                         summary.setColor(net.md_5.bungee.api.ChatColor.AQUA);
@@ -420,6 +420,5 @@ public class DrillDownCommand implements CommandExecutor {
                 }
             }
         });
-        return true;
     }
 }

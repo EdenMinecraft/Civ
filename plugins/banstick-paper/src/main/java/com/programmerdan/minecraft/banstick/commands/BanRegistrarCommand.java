@@ -1,5 +1,13 @@
 package com.programmerdan.minecraft.banstick.commands;
 
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Optional;
+import co.aikar.commands.annotation.Syntax;
 import com.programmerdan.minecraft.banstick.BanStick;
 import com.programmerdan.minecraft.banstick.data.BSIP;
 import com.programmerdan.minecraft.banstick.data.BSIPData;
@@ -8,42 +16,29 @@ import com.programmerdan.minecraft.banstick.data.BSRegistrars;
 import com.programmerdan.minecraft.banstick.data.BSSession;
 import com.programmerdan.minecraft.banstick.handler.BanHandler;
 import java.util.List;
-import java.util.UUID;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import vg.civcraft.mc.namelayer.NameLayerAPI;
 
-public class BanRegistrarCommand implements CommandExecutor {
+@CommandAlias("banprovider")
+@CommandPermission("banstick.banprovider")
+public class BanRegistrarCommand extends BaseCommand {
 
-    public static final String name = "banprovider";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0) {
-            sender.sendMessage(ChatColor.RED + "You must specify a player whose last provider will be banned");
-            return true;
-        }
-        UUID uuid = NameLayerAPI.getUUID(args[0]);
-        if (uuid == null) {
-            sender.sendMessage(ChatColor.RED + "No player " + args[0] + " is known");
-            return true;
-        }
-        BSPlayer player = BSPlayer.byUUID(uuid);
+    @Default
+    @Syntax("<playerName> [undo]")
+    @Description("(Un-)Bans the entire provider of the last connection used by a player based on what its registered as")
+    @CommandCompletion("@banstickPlayers")
+    public void onBanProvider(CommandSender sender, BSPlayer player, @Optional String undo) {
+        boolean isUndo = undo != null;
         BSSession lastSession = player.getLatestSession();
         BSIP ip = lastSession.getIP();
         List<BSIPData> proxyChecks = BSIPData.allByIP(ip);
-        if (proxyChecks.isEmpty()) {
-
-        }
         BSRegistrars handler = BanStick.getPlugin().getRegistrarHandler();
         for (BSIPData data : proxyChecks) {
             if (data.getRegisteredAs() == null || data.getRegisteredAs().isEmpty()) {
                 sender.sendMessage(ChatColor.RED + "Can not ban registrar, because none was known");
                 continue;
             }
-            if (args.length >= 2) {
+            if (isUndo) {
                 handler.unbanRegistrar(data);
                 sender.sendMessage(
                     ChatColor.GREEN + "Forgave registrar " + data.getRegisteredAs() + " of " + data.toString());
@@ -53,11 +48,10 @@ public class BanRegistrarCommand implements CommandExecutor {
                     ChatColor.GREEN + "Banning registrar " + data.getRegisteredAs() + " of " + data.toString());
             }
         }
-        if (args.length == 1) {
+        if (!isUndo) {
             //also give them an ip ban on the way if they dont have one already
             BanHandler.doIPBan(ip, null, null, true, false);
         }
-        return true;
     }
 
 }

@@ -1,45 +1,38 @@
 package com.programmerdan.minecraft.banstick.commands;
 
-import com.programmerdan.minecraft.banstick.data.BSExclusion;
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Syntax;
 import com.programmerdan.minecraft.banstick.data.BSPlayer;
+import com.programmerdan.minecraft.banstick.handler.ExclusionHandler;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.UUID;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
-import vg.civcraft.mc.namelayer.NameLayerAPI;
 
 /**
  * Untangle command, creates a new altgraph based on imputs.
  *
  * @author Maxopoly
  */
-public class UntangleCommand implements CommandExecutor {
+@CommandAlias("untangle")
+@CommandPermission("banstick.alts.modify")
+public class UntangleCommand extends BaseCommand {
 
-    public static String name = "untangle";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0) {
-            sender.sendMessage(ChatColor.RED + "You must specify player names or uuids");
-            return true;
-        }
-        Set<BSPlayer> subGraphPlayers = new HashSet<>();
+    @Default
+    @Syntax("<name/uuid> [name/uuid] [name/uuid] ...")
+    @Description("Reassigns alt groups")
+    @CommandCompletion("@banstickPlayers")
+    public void onUntangle(CommandSender sender, BSPlayer[] players) {
+        Set<BSPlayer> subGraphPlayers = new HashSet<>(Arrays.asList(players));
         Set<BSPlayer> allGraphPlayers = new HashSet<>();
-        // parse uuids out of the command
-        for (String arg : args) {
-            UUID uuid = resolveName(arg);
-            if (uuid == null) {
-                sender.sendMessage(ChatColor.RED + "Could not parse player: " + arg);
-                return false;
-            }
-            subGraphPlayers.add(BSPlayer.byUUID(uuid));
-        }
         // Determine all nodes (players) in the graph (association network) we are
         // creating a subgraph off
         for (BSPlayer player : subGraphPlayers) {
@@ -47,13 +40,16 @@ public class UntangleCommand implements CommandExecutor {
         }
 
         int delCounter = 0;
-        // Delete all preexisting exclusions within this graph
-        for (BSPlayer playerOuter : allGraphPlayers) {
-            for (BSPlayer playerInner : allGraphPlayers) {
-                BSExclusion excl = playerOuter.getExclusionWith(playerInner);
-                if (excl != null) {
-                    excl.delete();
-                    delCounter++;
+        // Delete all preexisting exclusions within this graph. banstick-velocity
+        // owns exclusion state, so this is a network call per pair rather than a
+        // local cache mutation.
+        List<BSPlayer> graphList = new ArrayList<>(allGraphPlayers);
+        for (int i = 0; i < graphList.size(); i++) {
+            for (int j = i + 1; j < graphList.size(); j++) {
+                if (ExclusionHandler.hasExclusionWith(graphList.get(i).getUUID(), graphList.get(j).getUUID())) {
+                    if (ExclusionHandler.deleteExclusion(graphList.get(i).getUUID(), graphList.get(j).getUUID())) {
+                        delCounter++;
+                    }
                 }
             }
         }
@@ -65,10 +61,9 @@ public class UntangleCommand implements CommandExecutor {
         outsideSubGraphPlayers.removeAll(subGraphPlayers);
         for (BSPlayer inside : subGraphPlayers) {
             for (BSPlayer outside : outsideSubGraphPlayers) {
-                BSExclusion excl = BSExclusion.create(inside, outside);
-                inside.addExclusion(excl);
-                outside.addExclusion(excl);
-                createCounter++;
+                if (ExclusionHandler.createExclusion(inside.getUUID(), outside.getUUID())) {
+                    createCounter++;
+                }
             }
         }
         sender.sendMessage(ChatColor.GREEN + String.format(
@@ -93,40 +88,6 @@ public class UntangleCommand implements CommandExecutor {
         }
         sender.sendMessage(ChatColor.GREEN + String.format("Second group created contains %d players: %s",
             outsideSubGraphPlayers.size(), sb.toString()));
-        return true;
-    }
-
-    /**
-     * Given a string, determine if name or uuid, and return uuid that relates.
-     *
-     * @param input a string
-     * @return a UUID that matches, or null if no match.
-     */
-    public static UUID resolveName(String input) {
-        if (input.length() <= 16) {
-            // interpret as player name
-            try {
-                return NameLayerAPI.getUUID(input);
-            } catch (NoClassDefFoundError ncde) {
-            }
-            Player match = Bukkit.getPlayer(input);
-            if (match != null) {
-                return match.getUniqueId();
-            } else {
-                @SuppressWarnings("deprecation")
-                OfflinePlayer offPlay = Bukkit.getOfflinePlayer(input);
-                if (offPlay != null) {
-                    return offPlay.getUniqueId();
-                }
-            }
-        } else if (input.length() == 36) {
-            try {
-                return UUID.fromString(input);
-            } catch (IllegalArgumentException iae) {
-                return null;
-            }
-        }
-        return null;
     }
 
 }

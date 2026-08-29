@@ -1,0 +1,24 @@
+# Database connection for the shared `banstick` database. banstick-velocity is the
+# only process that reads/writes bs_player.bid, bs_ban, and bs_ban_log -- Paper
+# instances ask it for ban data instead of touching those tables/columns directly.
+database:
+  host: "host"
+  port: 3306
+  database: banstick
+  user: "user"
+  password: "password"
+  poolsize: 10
+  connectionTimeout: 3000
+  idleTimeout: 600000
+  maxLifetime: 7200000
+
+# Redis connection used for the request/response protocol with banstick-paper
+# instances (see world.edenmc.banstickapi.BanStickChannels).
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+
+# Default message shown to a player denied at login due to an active ban, used
+# only when the stored ban has no message of its own.
+banMessage: "You are banned."

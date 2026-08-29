@@ -1,19 +1,21 @@
 package com.programmerdan.minecraft.banstick.commands;
 
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
 import com.programmerdan.minecraft.banstick.BanStick;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
-public class BanSaveCommand implements CommandExecutor {
+@CommandAlias("bansave|bsbs")
+@CommandPermission("banstick.ips")
+public class BanSaveCommand extends BaseCommand {
 
-    public static String name = "bansave";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String cmdString, String[] arguments) {
+    @Default
+    @Description("Flush cached changes straight to DB.")
+    public void onBanSave(CommandSender sender) {
         BanStick.getPlugin().saveCache();
-
-        return true;
     }
 
 }

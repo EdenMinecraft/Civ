@@ -105,11 +105,11 @@ public class BSRegistrars {
                         + "but did not have an active player");
                     continue;
                 }
-                BanHandler.doUUIDBan(player.getUniqueId(), true);
+                String banMessage = "Banned for blacklisted provider " + data.getRegisteredAs();
+                BanHandler.doUUIDBan(player.getUniqueId(), banMessage, true);
                 BanStick.getPlugin().info("Banning " + player.getName() + " for "
                     + "blacklisted provider " + data.getRegisteredAs());
-                BanStick.getPlugin().getEventHandler().doKickWithCheckup(player.getUniqueId(),
-                    session.getPlayer().getBan());
+                BanStick.getPlugin().getEventHandler().doKickWithCheckup(player.getUniqueId(), banMessage);
             }
         }
     }

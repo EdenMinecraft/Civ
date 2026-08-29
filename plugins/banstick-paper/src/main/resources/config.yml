@@ -1,3 +1,14 @@
+# Connection to the banstick-velocity plugin on the proxy. All ban/unban issuance
+# and ban status checks are forwarded here over Redis pub/sub -- banstick-velocity
+# is the single owner of bs_player.bid / bs_ban / bs_ban_log, so Main and PVP can
+# never see a different ban state for the same player.
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  # How long (ms) to wait for banstick-velocity to reply before giving up.
+  requestTimeoutMs: 5000
+
 # Define here the database connection primitives.
 #  poolsize: How many connections to maintain at maximum
 #  connectionTimeout: In milliseconds, how long to wait for replies before timing out

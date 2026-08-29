@@ -4,6 +4,7 @@ import com.programmerdan.minecraft.banstick.BanStick;
 import com.programmerdan.minecraft.banstick.data.BSBan;
 import com.programmerdan.minecraft.banstick.data.BSIP;
 import com.programmerdan.minecraft.banstick.data.BSPlayer;
+import com.programmerdan.minecraft.banstick.handler.BanHandler;
 import com.programmerdan.minecraft.banstick.handler.ImportWorker;
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
@@ -223,17 +224,17 @@ public class IpCheckImportWorker extends ImportWorker {
                                 ban = BSBan.create("Banned for Multiaccounting", null, true);
                             }
 
-                            player.setBan(ban);
+                            BanHandler.requestBan(player, ban);
                         }
 
                         boolean isJoinExempt = rs.getBoolean(5);
                         if (isJoinExempt) {
-                            player.setSharedPardonTime(new Date());
+                            BanHandler.setSharedPardon(uuid);
                         }
                         boolean isProtected = rs.getBoolean(7);
                         if (isProtected) {
-                            player.setIPPardonTime(new Date());
-                            player.setSharedPardonTime(new Date());
+                            BanHandler.setIPPardon(uuid);
+                            BanHandler.setSharedPardon(uuid);
                         }
 
                         thisCycle++;

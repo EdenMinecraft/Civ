@@ -1,5 +1,12 @@
 package com.programmerdan.minecraft.banstick.commands;
 
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Syntax;
 import com.programmerdan.minecraft.banstick.BanStick;
 import com.programmerdan.minecraft.banstick.handler.BanStickDatabaseHandler;
 import java.sql.Connection;
@@ -11,8 +18,6 @@ import java.util.Arrays;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -24,12 +29,15 @@ import org.bukkit.entity.Player;
  *
  * @author <a href="mailto:programmerdan@gmail.com">ProgrammerDan</a>
  */
-public class DowsingRodCommand implements CommandExecutor {
+@CommandAlias("dowsingrod|bsdr|diviningrod")
+@CommandPermission("banstick.lovetap")
+public class DowsingRodCommand extends BaseCommand {
 
-    public static String name = "dowsingrod";
-
-    @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String cmdString, String[] arguments) {
+    @Default
+    @Syntax("[CONTINENT|COUNTRY|REGION|STATE|CITY|POSTAL|ZIP|DOMAIN|PROVIDER|REGISTEREDAS|CONNECTION]x3 [page] [perpage]")
+    @Description("Investigate breakdown of networks by up to three attributes")
+    @CommandCompletion("@ipDataAttributes")
+    public void onDowsingRod(CommandSender sender, String[] arguments) {
 		/*
 		 * /dowsingrod [CONTINENT|COUNTRY|REGION|STATE|CITY|POSTAL|ZIP|DOMAIN|PROVIDER|REGISTEREDAS|CONNECTION] 
 		 * page# perpage
@@ -139,14 +147,14 @@ public class DowsingRodCommand implements CommandExecutor {
         } catch (SQLException e) {
             BanStick.getPlugin().severe("Failure to satisfy request at a DB level!", e);
             sender.sendMessage(ChatColor.RED + "There was a database failure, try again later.");
-            return true;
+            return;
         } finally {
             requestLen = System.currentTimeMillis() - requestLen;
         }
 
         if (toDisplay.isEmpty()) {
             sender.sendMessage(ChatColor.YELLOW + "No results. " + ChatColor.DARK_GRAY + " took " + requestLen + " ms");
-            return true;
+            return;
         } else {
             StringBuilder formatString = new StringBuilder();
             for (int i = 0; i <= sorts.size(); i++) {
@@ -196,7 +204,7 @@ public class DowsingRodCommand implements CommandExecutor {
                 player.spigot().sendMessage(controls);
             }
             sender.sendMessage(ChatColor.DARK_GRAY + "query took " + requestLen + " ms");
-            return true;
+            return;
         }
     }
 }

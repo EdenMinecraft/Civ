@@ -1,15 +1,22 @@
 package com.programmerdan.minecraft.banstick.commands;
 
-import com.programmerdan.minecraft.banstick.BanStick;
+import co.aikar.commands.BaseCommand;
+import co.aikar.commands.InvalidCommandArgument;
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Syntax;
+import com.programmerdan.minecraft.banstick.handler.BanHandler;
 import com.programmerdan.minecraft.banstick.data.BSPlayer;
 import com.programmerdan.minecraft.banstick.data.BSShare;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import vg.civcraft.mc.namelayer.NameLayerAPI;
@@ -19,12 +26,11 @@ import vg.civcraft.mc.namelayer.NameLayerAPI;
  *
  * @author <a href="mailto:programmerdan@gmail.com">ProgrammerDan</a>
  */
-public class TakeItBackCommand implements CommandExecutor {
-
-    public static String name = "takeitback";
-
-    // TODO: Unsafe command structure as player could have name of IP or PROXY or SHARED
-    //    and that would break this command.
+// TODO: Unsafe command structure as player could have name of IP or PROXY or SHARED
+//    and that would break this command.
+@CommandAlias("takeitback|unforgive|buryhim")
+@CommandPermission("banstick.forgive")
+public class TakeItBackCommand extends BaseCommand {
 
     /**
      * <b>takeitback [name/uuid] [IP] [PROXY] [SHARED]</b>
@@ -35,49 +41,12 @@ public class TakeItBackCommand implements CommandExecutor {
      * <b>takeitback [name/uuid] [name/uuid]</b>
      * Immediately unpardons all shares between these two players.
      */
-    @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String cmdString, String[] arguments) {
-        if (arguments.length < 2) {
-            return false;
-        }
-
-        String toRevoke = arguments[0];
-        String secRevoke = arguments[1];
-        List<String> revokes = Arrays.asList(Arrays.copyOfRange(arguments, 1, arguments.length));
-
-        BanStick.getPlugin().debug("toRevoke: {0}, secRevoke: {1}, revokes: {2}",
-            toRevoke, secRevoke, revokes);
-
-        UUID playerId = null;
-        if (toRevoke.length() <= 16) {
-            try {
-                playerId = null;
-                try {
-                    playerId = NameLayerAPI.getUUID(toRevoke);
-                } catch (NoClassDefFoundError ncde) {
-                }
-
-                if (playerId == null) {
-                    Player match = Bukkit.getPlayer(toRevoke);
-                    if (match != null) {
-                        playerId = match.getUniqueId();
-                    }
-                }
-            } catch (Exception ee) {
-                sender.sendMessage(ChatColor.RED + "Unable to find player " + ChatColor.DARK_RED + toRevoke);
-                return true;
-            }
-        } else if (toRevoke.length() == 36) {
-            try {
-                playerId = UUID.fromString(toRevoke);
-            } catch (IllegalArgumentException iae) {
-                sender.sendMessage(ChatColor.RED + "Unable to process uuid " + ChatColor.DARK_RED + toRevoke);
-                return true;
-            }
-        } else {
-            sender.sendMessage(ChatColor.RED + "Unable to interpret " + ChatColor.DARK_RED + toRevoke);
-            return true;
-        }
+    @Default
+    @Syntax("<name/uuid> <IP|PROXY|SHARED ...>  |  <name/uuid> <name/uuid>")
+    @Description("Remove exemptions/ignores with this command.")
+    @CommandCompletion("@banstickPlayers @banPardonTypes")
+    public void onTakeItBack(CommandSender sender, BSPlayer player, String secRevoke, String[] rest) {
+        UUID playerId = player.getUUID();
 
         UUID secondPlayerId = null;
         if (secRevoke.length() <= 16) {
@@ -101,21 +70,22 @@ public class TakeItBackCommand implements CommandExecutor {
             try {
                 secondPlayerId = UUID.fromString(secRevoke);
             } catch (IllegalArgumentException iae) {
-                sender.sendMessage(ChatColor.RED + "Unable to process uuid " + ChatColor.DARK_RED + secRevoke);
-                return true;
+                throw new InvalidCommandArgument("Unable to process uuid " + secRevoke);
             }
         } else {
-            sender.sendMessage(ChatColor.RED + "Unable to interpret " + ChatColor.DARK_RED + secRevoke);
-            return true;
+            throw new InvalidCommandArgument("Unable to interpret " + secRevoke);
         }
 
-        BSPlayer player = BSPlayer.byUUID(playerId);
         if (secondPlayerId == null) { // single player unpardon.
+            List<String> revokes = new ArrayList<>(rest.length + 1);
+            revokes.add(secRevoke);
+            revokes.addAll(Arrays.asList(rest));
+
             boolean match = false;
             for (String pardon : revokes) {
                 if ("IP".equalsIgnoreCase(pardon)) {
-                    if (player.getIPPardonTime() != null) {
-                        player.setIPPardonTime(null);
+                    if (BanHandler.getPlayerStatus(playerId).ipPardonTime() != null) {
+                        BanHandler.clearIPPardon(playerId);
                         sender.sendMessage(ChatColor.GREEN + "Player " + player.getName()
                             + " is exposed to future IP bans. Existing bans aren't impacted.");
                     } else {
@@ -126,8 +96,8 @@ public class TakeItBackCommand implements CommandExecutor {
                 }
 
                 if ("PROXY".equalsIgnoreCase(pardon)) {
-                    if (player.getProxyPardonTime() != null) {
-                        player.setProxyPardonTime(null);
+                    if (BanHandler.getPlayerStatus(playerId).proxyPardonTime() != null) {
+                        BanHandler.clearProxyPardon(playerId);
                         sender.sendMessage(ChatColor.GREEN + "Player " + player.getName()
                             + " is exposed to future Proxy bans. Existing warnings aren't impacted.");
                     } else {
@@ -138,8 +108,8 @@ public class TakeItBackCommand implements CommandExecutor {
                 }
 
                 if ("SHARED".equalsIgnoreCase(pardon)) {
-                    if (player.getSharedPardonTime() != null) {
-                        player.setSharedPardonTime(null);
+                    if (BanHandler.getPlayerStatus(playerId).sharedPardonTime() != null) {
+                        BanHandler.clearSharedPardon(playerId);
                         sender.sendMessage(ChatColor.GREEN + "Player " + player.getName()
                             + " is exposed to future Share warnings/bans. Existing warning/bans aren't impacted.");
                     } else {
@@ -150,11 +120,8 @@ public class TakeItBackCommand implements CommandExecutor {
                 }
             }
 
-            if (match) {
-                return true;
-            } else {
-                sender.sendMessage(ChatColor.RED + "Could not determine what to do.");
-                return false;
+            if (!match) {
+                throw new InvalidCommandArgument("Could not determine what to do.", false);
             }
         } else {
             // unpardon shares between two people
@@ -177,7 +144,6 @@ public class TakeItBackCommand implements CommandExecutor {
                 sender.sendMessage(ChatColor.YELLOW + "Player " + player.getName()
                     + " does not share any connections with " + player2.getName());
             }
-            return true;
         }
     }
 
