@@ -50,6 +50,7 @@ include(":plugins:kiragateway-velocity")
 include(":plugins:fortunedrops-paper")
 include(":plugins:civspy-api")
 include(":plugins:civspy-paper")
+include(":plugins:broadcast-velocity")
 
 // Eden additions
 include(":plugins:civadvancements-paper")
