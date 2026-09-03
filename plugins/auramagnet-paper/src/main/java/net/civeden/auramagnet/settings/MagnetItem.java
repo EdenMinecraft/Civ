@@ -13,6 +13,7 @@ public enum MagnetItem {
     POTATO(Material.POTATO, "Potato"),
     CARROT(Material.CARROT, "Carrot"),
     BEETROOT(Material.BEETROOT, "Beetroot"),
+    BEETROOT_SEEDS(Material.BEETROOT_SEEDS, "Beetroot Seeds"),
     NETHER_WART(Material.NETHER_WART, "Nether Wart"),
     COCOA_BEANS(Material.COCOA_BEANS, "Cocoa Beans"),
     SUGAR_CANE(Material.SUGAR_CANE, "Sugar Cane"),
