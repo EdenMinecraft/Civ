@@ -16,6 +16,7 @@ dependencies {
     compileOnly(project(":plugins:bastion-paper"))
     compileOnly(project(":plugins:civmodcore-paper"))
     compileOnly(project(":plugins:citadel-paper"))
+    compileOnly(project(":plugins:itemexchange-paper"))
 }
 
 tasks {
