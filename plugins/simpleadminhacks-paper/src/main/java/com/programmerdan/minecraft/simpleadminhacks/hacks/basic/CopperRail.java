@@ -55,6 +55,7 @@ public class CopperRail extends BasicHack {
     private static final double FURNACE_MAX_SPEED_FACTOR = 0.5;
     private static final double GRINDER_MOVING_SPEED = 0.04;
     private static final int GRINDER_HUD_INTERVAL = 10;
+    private static final double GRINDER_TURN_RATE = Math.toRadians(3);
 
     @AutoLoad
     private boolean deoxidise;
@@ -175,6 +176,9 @@ public class CopperRail extends BasicHack {
             Vector heading;
             if (Math.hypot(velocity.getX(), velocity.getZ()) > GRINDER_MOVING_SPEED) {
                 heading = new Vector(velocity.getX(), 0.0, velocity.getZ()).normalize();
+                if (!isOnRail(cart)) {
+                    heading = steerToward(heading, player.getLocation().getYaw());
+                }
             } else if (player.getCurrentInput().isForward()) {
                 heading = yawToDirection(player.getLocation().getYaw());
             } else {
@@ -198,6 +202,19 @@ public class CopperRail extends BasicHack {
             return new Vector(0.0, 0.0, -1.0);
         }
         return new Vector(1.0, 0.0, 0.0);
+    }
+
+    private static boolean isOnRail(Minecart cart) {
+        Block block = cart.getLocation().getBlock();
+        return MaterialTags.RAILS.isTagged(block) || MaterialTags.RAILS.isTagged(block.getRelative(BlockFace.DOWN));
+    }
+
+    private static Vector steerToward(Vector heading, float yaw) {
+        double current = Math.atan2(heading.getX(), heading.getZ());
+        double desired = -Math.toRadians(yaw);
+        double delta = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
+        double angle = current + Math.max(-GRINDER_TURN_RATE, Math.min(GRINDER_TURN_RATE, delta));
+        return new Vector(Math.sin(angle), 0.0, Math.cos(angle));
     }
 
     private static boolean weatheringTarget(Block block, boolean grinding) {
