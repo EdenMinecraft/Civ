@@ -10,6 +10,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Minecart;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.minecart.PoweredMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -60,6 +61,10 @@ public final class BetterRails extends SimpleHack<BetterRailsConfig> implements 
             return;
         }
 
+        if (minecart instanceof PoweredMinecart) {
+            return;
+        }
+
         Location to = event.getTo();
         Location from = event.getFrom();
         if (to.getBlockX() == from.getBlockX() && to.getBlockY() == from.getBlockY() && to.getBlockZ() == from.getBlockZ()) {
@@ -77,6 +82,10 @@ public final class BetterRails extends SimpleHack<BetterRailsConfig> implements 
     @EventHandler
     public void on(VehicleEnterEvent event) {
         if (!(event.getVehicle() instanceof Minecart minecart)) {
+            return;
+        }
+
+        if (minecart instanceof PoweredMinecart) {
             return;
         }
 

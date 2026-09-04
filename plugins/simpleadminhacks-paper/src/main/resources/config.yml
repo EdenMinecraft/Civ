@@ -532,6 +532,23 @@ hacks:
     # Chance to oxidise copper one level.
     # Unoxidised copper will oxidise at 75% of this level.
     damage: 0.03
+    # Amethyst-powered grinder carts: ride a furnace minecart fuelled with amethyst
+    # down a rail line and it grinds the copper beneath the rails fully clean as it
+    # goes. It never rusts the line. When the fuel runs out it coasts to a stop.
+    grinder: true
+    # Let players ride powered (furnace) minecarts at all. Needed to use the grinder.
+    ridePoweredCarts: true
+    # Items accepted as grinder fuel (coal/charcoal is always refused while enabled).
+    grinderFuel:
+      - AMETHYST_SHARD
+    # Vanilla fuel ticks granted per fuel item, and the fuel cap. Vanilla burns one
+    # fuel tick per game tick (20/s), so 800 is ~40s of running per amethyst.
+    grinderFuelPerItem: 800
+    grinderMaxFuel: 8000
+    # Fixed grinder cart speed in m/s (same on every block, no copper boost) and a
+    # hard ceiling so a mis-set speed can't turn it into a bullet.
+    grinderSpeedMetresPerSecond: 12
+    grinderSpeedHardCap: 20
   FasterHorses:
     enabled: true
     minSpeed: 0.1125
