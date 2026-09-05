@@ -2,6 +2,7 @@ package com.github.longboyy.eve.listeners;
 
 import com.github.longboyy.eve.EvePlugin;
 import com.github.longboyy.eve.model.SnitchHitType;
+import com.untamedears.itemexchange.glues.jukealert.ShopPurchaseSnitchEvent;
 import com.untamedears.jukealert.events.PlayerHitSnitchEvent;
 import com.untamedears.jukealert.events.PlayerLoginSnitchEvent;
 import com.untamedears.jukealert.events.PlayerLogoutSnitchEvent;
@@ -37,6 +38,12 @@ public class SnitchListener implements Listener {
     public void onSnitchLogout(PlayerLogoutSnitchEvent event){
         if(isSnitchImmune(event.getPlayer(), event.getSnitch())) return;
         this.plugin.getRelayManager().publishSnitchHit(event.getPlayer(), event.getSnitch(), SnitchHitType.LOGOUT);
+    }
+
+    @EventHandler
+    public void onSnitchPurchase(ShopPurchaseSnitchEvent event){
+        if(isSnitchImmune(event.getPurchaser(), event.getSnitch())) return;
+        this.plugin.getRelayManager().publishPurchase(event.getPurchaser(), event.getSnitch(), event.getPaymentItems(), event.getPurchasedItems());
     }
 
     private boolean isSnitchImmune(Player player, Snitch snitch){

@@ -16,7 +16,7 @@ public class SuccessfulPurchaseEvent extends Event {
     private final ItemStack[] input;
     private final ItemStack[] output;
 
-    private SuccessfulPurchaseEvent(Player player, TradeRule trade, ItemStack[] input, ItemStack[] output) {
+    protected SuccessfulPurchaseEvent(Player player, TradeRule trade, ItemStack[] input, ItemStack[] output) {
         this.player = player;
         this.trade = trade;
         this.input = input;

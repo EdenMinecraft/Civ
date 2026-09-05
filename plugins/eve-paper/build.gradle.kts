@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.paper.userdev)
 }
 
-version = "1.0.2"
+version = "1.0.3"
 
 dependencies {
     paperweight {
@@ -13,6 +13,7 @@ dependencies {
     compileOnly(project(":plugins:civchat2-paper"))
     compileOnly(project(":plugins:jukealert-paper"))
     compileOnly(project(":plugins:namelayer-paper"))
+    compileOnly(project(":plugins:itemexchange-paper"))
     compileOnly(libs.luckperms.api)
     compileOnly(libs.bundles.discordsrv)
     //compileOnly("com.discordsrv:discordsrv:1.28.0")

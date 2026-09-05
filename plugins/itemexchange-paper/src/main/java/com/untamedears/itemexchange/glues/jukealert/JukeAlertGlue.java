@@ -33,6 +33,7 @@ public final class JukeAlertGlue extends DependencyGlue {
             for (final Snitch snitch : JukeAlert.getInstance().getSnitchManager().getSnitchesCovering(location)) {
                 if (!purchaser.hasPermission("jukealert.vanish")) {
                     snitch.processAction((SnitchAction) shopPurchaseAction.getConstructors()[0].newInstance(snitch, purchaser.getUniqueId(), location, now));
+                    ShopPurchaseSnitchEvent.emit(snitch, purchaser, event.getTrade(), event.getPaymentItems(), event.getPurchasedItems());
                 }
             }
         }
