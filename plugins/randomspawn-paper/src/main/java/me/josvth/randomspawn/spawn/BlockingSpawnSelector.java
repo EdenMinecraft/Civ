@@ -1,6 +1,7 @@
 package me.josvth.randomspawn.spawn;
 
 import isaac.bastion.Bastion;
+import isaac.bastion.BastionBlock;
 import isaac.bastion.manager.BastionBlockManager;
 import me.josvth.randomspawn.handlers.YamlHandler;
 import org.bukkit.*;
@@ -81,12 +82,30 @@ public class BlockingSpawnSelector implements SpawnSelector {
         }
 
         if (Bukkit.getServer().getPluginManager().isPluginEnabled("Bastion")) {
+            List<String> excludedBastionTypes = yamlHandler.worlds.isList(worldName + ".excludedBastions") ?
+                yamlHandler.worlds.getStringList(worldName + ".excludedBastions") : new ArrayList<>();
+
             ret = ret.thenCompose(location -> {
                 BastionBlockManager bm = Bastion.getBastionManager();
                 if (bm != null) {
+                    boolean isBlocking = true;
+                    for(BastionBlock bastionBlock : bm.getBlockingBastions(location)){
+                        if(excludedBastionTypes.contains(bastionBlock.getType().getName())){
+                            isBlocking = false;
+                            continue;
+                        }
+                        isBlocking = true;
+                    }
+
+                    if(isBlocking){
+                        return getRandomSpawnLocationAsync(world, block);
+                    }
+
+                    /*
                     if (!bm.getBlockingBastions(location).isEmpty()) {
                         return getRandomSpawnLocationAsync(world, block);
                     }
+                     */
                 }
                 return CompletableFuture.completedFuture(location);
             });
