@@ -132,12 +132,13 @@ public class RelayManager {
 
         StringBuilder messageBuilder = new StringBuilder();
         String purchased = mergedOutputs.length == 0 ? "donated" : "purchased";
-        messageBuilder.append(String.format("<t:%d:T> `[%s]` **%s** %s at `%s`:\n\n",
+        messageBuilder.append(String.format("<t:%d:T> `[%s]` **%s** %s at snitch `%s` | `%s`:\n\n",
             currentTime,
             groupName,
             playerName,
             purchased,
-            snitchName
+            snitchName,
+            locationToString(player.getLocation())
         ));
 
         if(mergedInputs.length > 0){
