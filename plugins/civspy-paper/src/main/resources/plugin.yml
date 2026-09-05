@@ -2,7 +2,7 @@ name: CivSpy
 version: ${version}
 author: [ ProgrammerDan ]
 api-version: 1.13
-softdepend: [ RecipeManager, Citadel, NameLayer, HiddenOre, CropControl, ExilePearl, CrazyCrates, Bastion ]
+softdepend: [ RecipeManager, Citadel, NameLayer, HiddenOre, CropControl, ExilePearl, CrazyCrates, Bastion, ItemExchange ]
 main: com.programmerdan.minecraft.civspy.CivSpy
 commands:
 permissions:
