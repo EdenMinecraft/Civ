@@ -3,27 +3,34 @@ package com.github.longboyy.eve;
 import com.github.longboyy.eve.model.Relay;
 import com.github.longboyy.eve.model.SnitchHitType;
 import com.untamedears.jukealert.model.Snitch;
-import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.dependencies.jda.api.EmbedBuilder;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.ChannelType;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.GuildChannel;
+import github.scarsz.discordsrv.dependencies.jda.api.entities.MessageEmbed;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.TextChannel;
-import github.scarsz.discordsrv.dependencies.jda.api.entities.User;
 import github.scarsz.discordsrv.util.DiscordUtil;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.Nullable;
-import vg.civcraft.mc.namelayer.GroupManager;
-import vg.civcraft.mc.namelayer.NameLayerAPI;
-import vg.civcraft.mc.namelayer.NameLayerPlugin;
+import vg.civcraft.mc.civmodcore.chat.ChatUtils;
+import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
+import java.time.Instant;
+import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class RelayManager {
+
+    private final static MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     private final EvePlugin plugin;
 
@@ -76,10 +83,9 @@ public class RelayManager {
     }
 
     public void publishSnitchHit(Player player, Snitch snitch, SnitchHitType hitType){
-        if(snitch.getGroup() == null) return;
-        if(!this.relaysByGroupId.containsKey(snitch.getGroup().getGroupId())) return;
+        if(!snitchAndRelayExists(snitch)) return;
 
-        long currentTime = System.currentTimeMillis() / 1000L;
+        long currentTime = getCurrentTime();
         var relays = this.relaysByGroupId.get(snitch.getGroup().getGroupId());
 
         String snitchName = snitch.getName();
@@ -101,7 +107,69 @@ public class RelayManager {
             locationToString(player.getLocation())
         );
 
-        relays.forEach(relay -> publishToDiscord(relay.getChannelId(), message));
+        relays.forEach(relay -> publishMessageToDiscord(relay.getChannelId(), message));
+    }
+
+    public void publishPurchase(Player player, Snitch snitch, ItemStack[] inputs, ItemStack[] outputs){
+        if(snitch.getGroup() == null) return;
+        if(!this.relaysByGroupId.containsKey(snitch.getGroup().getGroupId())) return;
+
+        long currentTime = getCurrentTime();
+        var relays = this.relaysByGroupId.get(snitch.getGroup().getGroupId());
+
+        String snitchName = snitch.getName();
+        if(snitchName == null || snitchName.isBlank()){
+            snitchName = "unnamed_snitch";
+        }
+        // Escape any backticks in the snitch name
+        snitchName = snitchName.replace("`", "'");
+
+        String groupName = snitch.getGroup().getName().replace("`", "'");
+        String playerName = player.getName().replace("`", "'");
+
+        ItemStack[] mergedInputs = mergeItemStacks(inputs);
+        ItemStack[] mergedOutputs = mergeItemStacks(outputs);
+
+        StringBuilder messageBuilder = new StringBuilder();
+        String purchased = mergedOutputs.length == 0 ? "donated" : "purchased";
+        messageBuilder.append(String.format("<t:%d:T> `[%s]` **%s** %s at snitch `%s` | `%s`:\n\n",
+            currentTime,
+            groupName,
+            playerName,
+            purchased,
+            snitchName,
+            locationToString(player.getLocation())
+        ));
+
+        if(mergedInputs.length > 0){
+            messageBuilder.append("**Input Items:**").append("\n");
+            for(ItemStack item : mergedInputs){
+                messageBuilder.append("* ").append(ItemStackToString(item)).append("\n");
+            }
+            messageBuilder.append("\n");
+        }
+
+        if(mergedOutputs.length > 0){
+            messageBuilder.append("**Output Items:**").append("\n");
+            for(ItemStack item : mergedOutputs){
+                messageBuilder.append("* ").append(ItemStackToString(item)).append("\n");
+            }
+        }
+
+        String message = messageBuilder.toString().trim();
+
+        relays.forEach(relay -> publishMessageToDiscord(relay.getChannelId(), message));
+
+        /*
+        EmbedBuilder embedBuilder = new EmbedBuilder();
+        embedBuilder.setTitle(String.format("Purchase detected at snitch %s", snitchName));
+        embedBuilder.setTimestamp(Instant.ofEpochSecond(currentTime));
+        StringBuilder
+
+        MessageEmbed embed = embedBuilder.build();
+        relays.forEach(relay -> publishEmbedToDiscord(relay.getChannelId(), embed));
+         */
+
     }
 
     private @Nullable Relay findGroupRelayByChannel(int groupId, String channelId){
@@ -128,7 +196,7 @@ public class RelayManager {
             location.getBlockZ() + "]";
     }
 
-    private void publishToDiscord(String channelId, String message){
+    private void publishMessageToDiscord(String channelId, String message){
         try {
             GuildChannel channel = DiscordUtil.getJda().getGuildChannelById(channelId);
             if(channel == null || channel.getType() != ChannelType.TEXT) return;
@@ -137,5 +205,61 @@ public class RelayManager {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /*
+    private void publishEmbedToDiscord(String channelId, MessageEmbed embed){
+        try {
+            GuildChannel channel = DiscordUtil.getJda().getGuildChannelById(channelId);
+            if(channel == null || channel.getType() != ChannelType.TEXT) return;
+            TextChannel textChannel = (TextChannel)channel;
+            textChannel.sendMessageEmbeds(embed).queue();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+     */
+
+    private boolean snitchAndRelayExists(Snitch snitch){
+        return snitch.getGroup() != null && this.relaysByGroupId.containsKey(snitch.getGroup().getGroupId());
+    }
+
+    private long getCurrentTime(){
+        return System.currentTimeMillis() / 1000L;
+    }
+
+    private static final Pattern ITEMSTACK_PATTERN =  Pattern.compile("\\[(.*)]");
+    private static String ItemStackToString(ItemStack itemStack){
+        StringBuilder builder = new StringBuilder();
+        builder.append("x").append(itemStack.getAmount()).append(" ");
+
+        String displayName = ChatUtils.stringify(itemStack.displayName());
+        Matcher matcher = ITEMSTACK_PATTERN.matcher(displayName);
+        builder.append(matcher.find() ? matcher.group(1) : displayName);
+
+        return builder.toString();
+    }
+
+    private static ItemStack[] mergeItemStacks(ItemStack[] items){
+        List<ItemStack> itemList = new ArrayList<>();
+        for(ItemStack item : items){
+            if(item == null) continue;
+            ItemStack existingItem = itemList.stream().filter(itemStack -> ItemUtils.areItemsSimilar(item, itemStack)).findFirst().orElse(null);
+            if(existingItem != null){
+                itemList.remove(existingItem);
+                int totalStackSize = existingItem.getAmount() + item.getAmount();
+                while(totalStackSize > 0){
+                    int addAmount = Math.min(totalStackSize, item.getMaxStackSize());
+                    ItemStack newItem = existingItem.clone();
+                    newItem.setAmount(addAmount);
+                    itemList.add(newItem);
+                    totalStackSize -= addAmount;
+                }
+            }else{
+                itemList.add(item);
+            }
+        }
+
+        return itemList.toArray(ItemStack[]::new);
     }
 }
