@@ -190,7 +190,7 @@ public class RelayManager {
     }
 
     private String locationToString(Location location){
-        return "[" +
+        return "[" + location.getWorld().getName() + " | " +
             location.getBlockX() + ", " +
             location.getBlockY() + ", " +
             location.getBlockZ() + "]";
