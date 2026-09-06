@@ -43,7 +43,7 @@ public class SnitchListener implements Listener {
     @EventHandler
     public void onSnitchPurchase(ShopPurchaseSnitchEvent event){
         if(isSnitchImmune(event.getPurchaser(), event.getSnitch())) return;
-        this.plugin.getRelayManager().publishPurchase(event.getPurchaser(), event.getSnitch(), event.getPaymentItems(), event.getPurchasedItems());
+        this.plugin.getRelayManager().publishPurchase(event.getPurchaser(), event.getSnitch(), event.getTrade().getBlock().getLocation(), event.getPaymentItems(), event.getPurchasedItems());
     }
 
     private boolean isSnitchImmune(Player player, Snitch snitch){

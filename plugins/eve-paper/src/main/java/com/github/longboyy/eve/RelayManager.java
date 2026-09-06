@@ -110,7 +110,7 @@ public class RelayManager {
         relays.forEach(relay -> publishMessageToDiscord(relay.getChannelId(), message));
     }
 
-    public void publishPurchase(Player player, Snitch snitch, ItemStack[] inputs, ItemStack[] outputs){
+    public void publishPurchase(Player player, Snitch snitch, Location location, ItemStack[] inputs, ItemStack[] outputs){
         if(snitch.getGroup() == null) return;
         if(!this.relaysByGroupId.containsKey(snitch.getGroup().getGroupId())) return;
 
@@ -138,7 +138,7 @@ public class RelayManager {
             playerName,
             purchased,
             snitchName,
-            locationToString(player.getLocation())
+            locationToString(location)
         ));
 
         if(mergedInputs.length > 0){
