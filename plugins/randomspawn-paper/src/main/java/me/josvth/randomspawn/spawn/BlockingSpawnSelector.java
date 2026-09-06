@@ -88,13 +88,12 @@ public class BlockingSpawnSelector implements SpawnSelector {
             ret = ret.thenCompose(location -> {
                 BastionBlockManager bm = Bastion.getBastionManager();
                 if (bm != null) {
-                    boolean isBlocking = true;
+                    boolean isBlocking = false;
                     for(BastionBlock bastionBlock : bm.getBlockingBastions(location)){
-                        if(excludedBastionTypes.contains(bastionBlock.getType().getName())){
-                            isBlocking = false;
-                            continue;
+                        if(!excludedBastionTypes.contains(bastionBlock.getType().getName())){
+                            isBlocking = true;
+                            break;
                         }
-                        isBlocking = true;
                     }
 
                     if(isBlocking){
@@ -184,7 +183,8 @@ public class BlockingSpawnSelector implements SpawnSelector {
     }
 
     private CompletableFuture<Location> chooseSpawn(double radius, double exclusionRadius, Location center, Set<Material> blacklist, boolean block) {
-        return chooseSpawnAttempt(block, new AtomicInteger(1000), radius, exclusionRadius, center, blacklist).thenApply(validSpawn -> {
+        int retryTimes = yamlHandler.config.getInt("retrySpawnTimes", 1000);
+        return chooseSpawnAttempt(block, new AtomicInteger(retryTimes), radius, exclusionRadius, center, blacklist).thenApply(validSpawn -> {
             if (validSpawn != null) {
                 return validSpawn.toLocation(center.getWorld());
             } else {
