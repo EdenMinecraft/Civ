@@ -125,14 +125,21 @@ public class PlayerListener implements Listener {
             return;
         }
         Block clicked = event.getClickedBlock();
-        if (clicked == null || clicked.getType() != Material.SEA_PICKLE) {
+        if (clicked == null) {
+            return;
+        }
+        // The player may have clicked the sea pickle itself, or the block it is attached to
+        Block seaPickleBlock = clicked.getType() == Material.SEA_PICKLE
+            ? clicked
+            : clicked.getRelative(event.getBlockFace());
+        if (seaPickleBlock.getType() != Material.SEA_PICKLE) {
             return;
         }
         ItemStack item = event.getItem();
         if (item == null || item.getType() != Material.SEA_PICKLE) {
             return;
         }
-        Plant plant = plantManager.getPlant(clicked);
+        Plant plant = plantManager.getPlant(seaPickleBlock);
         if (plant == null && growthConfigs.getGrowthConfigFallback(Material.SEA_PICKLE) == null) {
             return;
         }
