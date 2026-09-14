@@ -88,6 +88,10 @@ commands:
     description: Allows debugging of an event and its handlers
     usage: /<command> full.path.to.event
     permission: simpleadmin.eventdebug
+  nitrous:
+    description: Gives yourself the configured amount of grinder cart nitrous charges
+    usage: /<command> <amount>
+    permission: simpleadmin.nitrous
   setplayercap:
     description: Set player cap
     usage: /<command> <cap>
@@ -119,6 +123,7 @@ permissions:
       simpleadmin.elytrabypass: true
       simpleadmin.grantott: true
       simpleadmin.setplayercap: true
+      simpleadmin.nitrous: true
     simpleadmin.hacks:
       description: Allows control of the hacks and settings which simpleadminhacks supports
       default: op
@@ -166,6 +171,9 @@ permissions:
       default: op
     simpleadmin.setplayercap:
       description: Gives the ability to set the player cap
+      default: op
+    simpleadmin.nitrous:
+      description: Gives the ability to give yourself grinder cart nitrous charges
       default: op
     simpleadminhacks.wiki:
       description: Allows use of /wiki

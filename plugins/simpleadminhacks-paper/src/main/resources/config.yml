@@ -545,10 +545,37 @@ hacks:
     # fuel tick per game tick (20/s), so 800 is ~40s of running per amethyst.
     grinderFuelPerItem: 800
     grinderMaxFuel: 8000
-    # Fixed grinder cart speed in m/s (same on every block, no copper boost) and a
-    # hard ceiling so a mis-set speed can't turn it into a bullet.
+    # On-rail grinding cruise speed (m/s) and the ceiling for grind / surface /
+    # unpowered speeds. Nitrous has its own ceiling (grinderNitrousHardCap).
     grinderSpeedMetresPerSecond: 12
-    grinderSpeedHardCap: 20
+    grinderSpeedHardCap: 28
+    # ---- Off-rail "go-kart" driving. Does NOT affect on-rail grinding, and normal
+    # ---- minecarts on rails are always faster (BetterRails ignores furnace carts).
+    # Out-of-fuel carts still putter along at this speed (m/s) instead of coasting
+    # to a stop. While unpowered AND on a rail they still grind, at a low per-block
+    # chance. Set grinderUnpoweredSpeed to 0 for the old coast-to-stop behaviour.
+    grinderUnpoweredSpeed: 4
+    grinderUnpoweredGrindChance: 0.05
+    # Off-rail speed (m/s) on any surface not listed in grinderSurfaces.
+    grinderOffRailSpeed: 8
+    # Per-surface off-rail speed (m/s) for race tracks / bumper arenas. Any Material
+    # name; capped by grinderSpeedHardCap.
+    grinderSurfaces:
+      WHITE_CONCRETE: 22
+      LIGHT_GRAY_CONCRETE: 22
+      GRAY_CONCRETE: 22
+      BLACK_CONCRETE: 22
+    # Max height (blocks) an off-rail cart auto-climbs: 0.5 = slabs, stair fronts,
+    # carpet. It will never climb a full block. 0 disables step-up.
+    grinderStepHeight: 0.5
+    # Nitrous: hold this item and right-click while driving for a timed speed burst.
+    # One item is consumed per use. Match = Material + a lore line as FactoryMod
+    # writes it (& or section colour codes allowed; matched colour-blind).
+    nitrousMaterial: GUNPOWDER
+    nitrousLore: "Nitrous Charge"
+    nitrousSpeed: 26
+    nitrousDurationTicks: 60
+    grinderNitrousHardCap: 29
   FasterHorses:
     enabled: true
     minSpeed: 0.1125
