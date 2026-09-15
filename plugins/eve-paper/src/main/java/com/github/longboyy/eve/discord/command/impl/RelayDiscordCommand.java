@@ -4,6 +4,7 @@ import com.github.longboyy.eve.EvePermissionHandler;
 import com.github.longboyy.eve.EvePlugin;
 import com.github.longboyy.eve.discord.command.AuthedDiscordCommand;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.dependencies.jda.api.Permission;
 import github.scarsz.discordsrv.dependencies.jda.api.events.interaction.SlashCommandEvent;
 import github.scarsz.discordsrv.dependencies.jda.api.interactions.commands.OptionType;
 import github.scarsz.discordsrv.dependencies.jda.api.interactions.commands.build.CommandData;
@@ -48,6 +49,11 @@ public class RelayDiscordCommand extends AuthedDiscordCommand {
 
         event.deferReply(true).queue();
 
+        if(!event.getMember().hasPermission(Permission.MESSAGE_MANAGE)){
+            event.getHook().sendMessage("You do not have permission to use this command!").queue();
+            return;
+        }
+
         String groupName = Objects.requireNonNull(event.getOption("group_name")).getAsString();
         Group group = GroupManager.getGroup(groupName);
         var textChannel = event.getTextChannel();
@@ -58,14 +64,14 @@ public class RelayDiscordCommand extends AuthedDiscordCommand {
             return;
         }
 
-        UUID playerUUID = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
-        if(!NameLayerAPI.getGroupManager().hasAccess(group, playerUUID, EvePermissionHandler.getCreateRelayPermission())){
-            event.getHook().sendMessage("You do not have permission to create a relay for group " + groupName).queue();
-            logger.warning("Player " + playerUUID + " does not have permission to create a relay for group " + groupName + " (" + group.getGroupId() + ")");
-            return;
-        }
-
         if(event.getSubcommandName().equals("create")){
+            UUID playerUUID = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
+            if(!NameLayerAPI.getGroupManager().hasAccess(group, playerUUID, EvePermissionHandler.getCreateRelayPermission())){
+                event.getHook().sendMessage("You do not have permission to create a relay for group " + groupName).queue();
+                logger.warning("Player " + playerUUID + " does not have permission to create a relay for group " + groupName + " (" + group.getGroupId() + ")");
+                return;
+            }
+
             if(this.plugin.getRelayManager().createRelay(group.getGroupId(), textChannel.getGuild().getId(), textChannel.getId())){
                 event.getHook().sendMessage("Created a relay for group `" + groupName + "`").queue();
             }else{
