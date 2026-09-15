@@ -31,7 +31,6 @@ public class Group {
     private boolean isDisciplined; // if true, prevents any interactions with this group
     private boolean isValid = true;  // if false, then group has recently been deleted and is invalid
     private int id;
-    private Set<Integer> ids = Sets.<Integer>newConcurrentHashSet();
 
     private Group supergroup;
     private Set<Group> subgroups = Sets.<Group>newConcurrentHashSet();
@@ -53,7 +52,6 @@ public class Group {
         this.activityTimestamp = activityTimestamp;
 
         if (name == null) {
-            this.ids.add(id);
             this.id = id;
             return;
         }
@@ -63,15 +61,8 @@ public class Group {
             players.putAll(loadedMembers);
         }
 
-        // This returns list of ids w/ id holding largest # of players at top.
-        List<Integer> allIds = db.getAllIDs(name);
-        if (allIds != null && allIds.size() > 0) {
-            this.ids.addAll(allIds);
-            this.id = allIds.get(0); // default "root" id is the one with the players.
-        } else {
-            this.ids.add(id);
-            this.id = id; // otherwise just use what we're given
-        }
+        Integer dbId = db.getId(name);
+        this.id = dbId != null ? dbId : id; // fall back to the passed-in id if the name isn't in the db yet
 
         // only get subgroups, supergroups will set themselves
         for (Group subgroup : GroupManager.getSubGroups(name)) {
@@ -610,13 +601,13 @@ public class Group {
     }
 
     /**
-     * Addresses issue above somewhat. Allows implementations that need the whole list of Ids
-     * associated with this groupname to get them.
+     * Retained for API compatibility. Since the collapse migration a group name maps to a single id,
+     * so this always returns a one-element list.
      *
-     * @return list of ids paired with this group name.
+     * @return the ids paired with this group name.
      */
     public List<Integer> getGroupIds() {
-        return new ArrayList<Integer>(this.ids);
+        return List.of(this.id);
     }
 
     // == SETTERS ========================================================================= //
@@ -668,15 +659,6 @@ public class Group {
         this.isValid = valid;
     }
 
-    // acts as replace
-    public void setGroupId(int id) {
-        this.ids.remove(this.id);
-        this.id = id;
-        if (!ids.contains(this.id)) {
-            this.ids.add(this.id);
-        }
-    }
-
     public TextColor getGroupColor() {
         return groupColor;
     }
@@ -694,22 +676,6 @@ public class Group {
 
     public Component getGroupNameColored() {
         return Component.text(this.name, this.groupColor);
-    }
-
-    /**
-     * Updates/replaces the group id list with a new one. Clears the old one, adds these,
-     * and ensures that the "main" id is added to the list as well.
-     *
-     * @param ids the list of IDs to replace
-     */
-    public void setGroupIds(List<Integer> ids) {
-        this.ids.clear();
-        if (ids != null) {
-            this.ids.addAll(ids);
-        }
-        if (!ids.contains(this.id)) {
-            this.ids.add(this.id);
-        }
     }
 
     @Override

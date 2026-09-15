@@ -47,7 +47,7 @@ public class GroupCreateCancelTest {
 
         dao = mock(GroupManagerDao.class);
         when(dao.getAllMembers(anyString())).thenReturn(Collections.emptyMap());
-        when(dao.getAllIDs(anyString())).thenReturn(List.of(1));
+        when(dao.getId(anyString())).thenReturn(1);
         when(dao.getSubGroups(anyString())).thenReturn(Collections.emptyList());
         when(dao.getGroup(anyInt())).thenReturn(null);
         TestDaoInjector.inject(dao);

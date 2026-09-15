@@ -44,8 +44,7 @@ public class GroupManagerDao {
         "from faction f "
         + "inner join faction_id fi on fi.group_name = f.group_name "
         + "where f.group_name = ?";
-    private static final String getGroupIDs = "SELECT f.group_id, count(DISTINCT fm.member_name) AS sz FROM faction_id f "
-        + "LEFT JOIN faction_member fm ON f.group_id = fm.group_id WHERE f.group_name = ? GROUP BY f.group_id ORDER BY sz DESC";
+    private static final String getGroupID = "SELECT group_id FROM faction_id WHERE group_name = ?";
     private static final String getGroupById = "select f.group_name, f.founder, f.password, f.discipline_flags, fi.group_id, f.last_timestamp, f.group_color " +
         "from faction f "
         + "inner join faction_id fi on fi.group_id = ? "
@@ -110,8 +109,6 @@ public class GroupManagerDao {
 
     // returns count of unique names of groups owned by founder
     private static final String countGroupsFromUUID = "select count(DISTINCT group_name) as count from faction where founder = ?";
-
-    private static final String mergeGroup = "call mergeintogroup(?,?)";
 
     private static final String updatePassword = "update faction set `password` = ? "
         + "where group_name = ?";
@@ -183,7 +180,6 @@ public class GroupManagerDao {
     private static final String getBlackListMembers = "select b.member_name from blacklist b inner join faction_id fi on fi.group_name=? where b.group_id=fi.group_id;";
 
     private static final String setGroupColor = "update faction set faction.group_color =? where faction.group_name =?;";
-    private static final String getAllGroupIds = "select group_id from faction_id";
 
 
     public GroupManagerDao(Logger logger, ManagedDatasource db) {
@@ -507,6 +503,94 @@ public class GroupManagerDao {
         //Adding support for groups to have a color assigned to them
         db.registerMigration(15, false,
             "alter table faction add group_color varchar(12) NOT NULL DEFAULT 'gray';");
+
+        // Collapse the shadow-id model to exactly one faction_id row per group_name.
+        //
+        // Historically merging produced several faction_id rows sharing one group_name ("shadow ids").
+        // Every group_name now keeps a single canonical group_id (the one with the most members);
+        // members, subgroups, permissions and blacklist entries from the other ids are reassigned to it,
+        // the redundant faction_id rows are dropped, and a UNIQUE(group_name) constraint makes the
+        // one-row invariant permanent. The mergeintogroup procedure that created shadow ids is dropped.
+        db.registerMigration(16, false,
+            "drop table if exists nl_id_remap;",
+            // Maps every non-canonical (shadow) group_id to its group_name's canonical group_id.
+            // Canonical = most distinct members, ties broken by lowest group_id.
+            "create table nl_id_remap ("
+                + "old_id int not null primary key,"
+                + "new_id int not null) charset=latin1;",
+            "insert into nl_id_remap (old_id, new_id) "
+                + "select ranked.group_id, canon.group_id "
+                + "from ("
+                + "  select f.group_id, f.group_name,"
+                + "    row_number() over ("
+                + "      partition by f.group_name "
+                + "      order by count(distinct fm.member_name) desc, f.group_id asc"
+                + "    ) as rnk "
+                + "  from faction_id f "
+                + "  left join faction_member fm on fm.group_id = f.group_id "
+                + "  group by f.group_id, f.group_name"
+                + ") ranked "
+                + "join ("
+                + "  select f.group_id, f.group_name,"
+                + "    row_number() over ("
+                + "      partition by f.group_name "
+                + "      order by count(distinct fm.member_name) desc, f.group_id asc"
+                + "    ) as rnk "
+                + "  from faction_id f "
+                + "  left join faction_member fm on fm.group_id = f.group_id "
+                + "  group by f.group_id, f.group_name"
+                + ") canon on canon.group_name = ranked.group_name and canon.rnk = 1 "
+                + "where ranked.rnk > 1;",
+            // faction_member: move to canonical, then delete the losing rows that the unique key skipped.
+            "update ignore faction_member fm join nl_id_remap r on fm.group_id = r.old_id set fm.group_id = r.new_id;",
+            "delete fm from faction_member fm join nl_id_remap r on fm.group_id = r.old_id;",
+            // subgroup: reassign both the supergroup side and the subgroup side.
+            "update ignore subgroup s join nl_id_remap r on s.group_id = r.old_id set s.group_id = r.new_id;",
+            "delete s from subgroup s join nl_id_remap r on s.group_id = r.old_id;",
+            "update ignore subgroup s join nl_id_remap r on s.sub_group_id = r.old_id set s.sub_group_id = r.new_id;",
+            "delete s from subgroup s join nl_id_remap r on s.sub_group_id = r.old_id;",
+            // Collapsing can leave a group pointing at itself; drop those self-links.
+            "delete from subgroup where group_id = sub_group_id;",
+            // permissionByGroup: PK(group_id,role,perm_id) dedups; IGNORE keeps the canonical row on conflict.
+            "update ignore permissionByGroup p join nl_id_remap r on p.group_id = r.old_id set p.group_id = r.new_id;",
+            "delete p from permissionByGroup p join nl_id_remap r on p.group_id = r.old_id;",
+            // blacklist has no unique key, so reassign then drop the duplicate (member_name, group_id) rows.
+            "update blacklist b join nl_id_remap r on b.group_id = r.old_id set b.group_id = r.new_id;",
+            "delete b from blacklist b "
+                + "join blacklist keep on keep.member_name = b.member_name and keep.group_id = b.group_id "
+                + "join nl_id_remap r on r.new_id = b.group_id "
+                + "where b.member_name <=> keep.member_name and b.group_id > keep.group_id;",
+            // Drop the now-redundant faction_id rows; one per group_name remains.
+            "delete fi from faction_id fi join nl_id_remap r on fi.group_id = r.old_id;",
+            "drop table nl_id_remap;",
+            // Make the one-row invariant permanent. The migration-4 non-unique index is now redundant.
+            "alter table faction_id drop index faction_id_index;",
+            "alter table faction_id add unique key uq_faction_id_group_name (group_name);",
+            // mergeintogroup repointed faction_id.group_name to create shadow ids; with the unique key it
+            // would now throw on duplicate group_name, so retire it. (Merge is reimplemented in plain JDBC.)
+            "drop procedure if exists mergeintogroup;",
+            // deletegroupfromtable likewise repointed faction_id.group_name to the special admin group,
+            // which now collides with the unique key. Rewrite it to delete the group's row outright.
+            "drop procedure if exists deletegroupfromtable;",
+            "create definer=current_user procedure deletegroupfromtable("
+                + "in groupName varchar(36),"
+                + "in specialAdminGroup varchar(36)"
+                + ") sql security invoker begin "
+                + "delete fm.* from faction_member fm "
+                + "inner join faction_id fi on fm.group_id = fi.group_id "
+                + "where fi.group_name = groupName;"
+                + "delete b.* from blacklist b "
+                + "inner join faction_id fi on b.group_id = fi.group_id "
+                + "where fi.group_name = groupName;"
+                + "delete s.* from subgroup s "
+                + "inner join faction_id fi on s.group_id = fi.group_id "
+                + "where fi.group_name = groupName;"
+                + "delete p.* from permissionByGroup p "
+                + "inner join faction_id fi on p.group_id = fi.group_id "
+                + "where fi.group_name = groupName;"
+                + "delete from faction_id where group_name = groupName;"
+                + "delete from faction where group_name = groupName;"
+                + "end;");
     }
 
     public int createGroup(String group, UUID owner, String password) {
@@ -1159,16 +1243,105 @@ public class GroupManagerDao {
         });
     }
 
+    /**
+     * Folds {@code toMerge} into {@code groupName} at the database level, in one transaction.
+     *
+     * <p>Each group_name now owns exactly one faction_id row (see migration 16), so there is a single
+     * destination group_id and a single source group_id. Members move from the source to the
+     * destination; where both groups hold the same member the DESTINATION's role wins (the source
+     * member row is dropped). Subgroup links pointing at the source are redirected to the destination.
+     * The source's dependent rows and its faction/faction_id header rows are then removed.
+     *
+     * <p>The supergroup unlink, permission deletion and cache invalidation are handled by
+     * {@link vg.civcraft.mc.namelayer.GroupManager#mergeGroup} around this call and are not repeated here.
+     */
     public void mergeGroup(String groupName, String toMerge) {
-        try (Connection connection = db.getConnection();
-             PreparedStatement mergeGroup = connection.prepareStatement(GroupManagerDao.mergeGroup);) {
-            mergeGroup.setString(1, groupName);
-            mergeGroup.setString(2, toMerge);
-            mergeGroup.execute();
+        try (Connection connection = db.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                Integer destId = lookupGroupId(connection, groupName);
+                Integer srcId = lookupGroupId(connection, toMerge);
+                if (destId == null || srcId == null) {
+                    logger.log(Level.WARNING, "Problem merging group {0} into {1}: missing faction_id row (dest={2}, src={3})",
+                        new Object[]{toMerge, groupName, destId, srcId});
+                    connection.rollback();
+                    return;
+                }
+
+                // Destination role wins: move only the source members the destination doesn't already have,
+                // then drop whatever source member rows remain (the overlaps).
+                try (PreparedStatement moveMembers = connection.prepareStatement(
+                    "update faction_member fm set fm.group_id = ? "
+                        + "where fm.group_id = ? "
+                        + "and fm.member_name not in (select member_name from "
+                        + "(select member_name from faction_member where group_id = ?) dest)")) {
+                    moveMembers.setInt(1, destId);
+                    moveMembers.setInt(2, srcId);
+                    moveMembers.setInt(3, destId);
+                    moveMembers.executeUpdate();
+                }
+
+                // Redirect any subgroup link (either side) that referenced the source to the destination.
+                try (PreparedStatement redirectSuper = connection.prepareStatement(
+                    "update subgroup set group_id = ? where group_id = ?")) {
+                    redirectSuper.setInt(1, destId);
+                    redirectSuper.setInt(2, srcId);
+                    redirectSuper.executeUpdate();
+                }
+                try (PreparedStatement redirectSub = connection.prepareStatement(
+                    "update subgroup set sub_group_id = ? where sub_group_id = ?")) {
+                    redirectSub.setInt(1, destId);
+                    redirectSub.setInt(2, srcId);
+                    redirectSub.executeUpdate();
+                }
+
+                // Drop everything still keyed to the source group_id before removing its faction_id row.
+                deleteBySourceId(connection, "delete from faction_member where group_id = ?", srcId);
+                deleteBySourceId(connection, "delete from blacklist where group_id = ?", srcId);
+                deleteBySourceId(connection, "delete from permissionByGroup where group_id = ?", srcId);
+                deleteBySourceId(connection, "delete from permissions where group_id = ?", srcId);
+                deleteBySourceId(connection, "delete from subgroup where group_id = ? or sub_group_id = ?", srcId, srcId);
+
+                try (PreparedStatement deleteFaction = connection.prepareStatement(
+                    "delete from faction where group_name = ?")) {
+                    deleteFaction.setString(1, toMerge);
+                    deleteFaction.executeUpdate();
+                }
+                try (PreparedStatement deleteId = connection.prepareStatement(
+                    "delete from faction_id where group_id = ?")) {
+                    deleteId.setInt(1, srcId);
+                    deleteId.executeUpdate();
+                }
+
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
         } catch (SQLException e) {
             logger.log(Level.WARNING, "Problem merging group " + toMerge + " into " + groupName, e);
         }
         removeCycles();
+    }
+
+    private Integer lookupGroupId(Connection connection, String groupName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(getGroupID)) {
+            statement.setString(1, groupName);
+            try (ResultSet set = statement.executeQuery()) {
+                return set.next() ? set.getInt(1) : null;
+            }
+        }
+    }
+
+    private void deleteBySourceId(Connection connection, String sql, int... ids) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            for (int i = 0; i < ids.length; i++) {
+                statement.setInt(i + 1, ids[i]);
+            }
+            statement.executeUpdate();
+        }
     }
 
     public void removeCycles() {
@@ -1681,34 +1854,28 @@ public class GroupManagerDao {
     }
 
     /**
-     * Gets all the IDs for this group name, sorted by "size" in membercount.
-     * Ideally only one groupname/id has members and the rest are shadows, but in any case
-     * we arbitrarily define primacy as the one with the most members for ease of accounting
-     * and backwards compatibility.
+     * Gets the single group_id for this group name. Since the collapse migration there is exactly one
+     * faction_id row per group_name.
      *
-     * @param groupName the group name to get IDs for
-     * @return the list of IDs for this group name
+     * @param groupName the group name to look up
+     * @return the group_id, or null if the name is unknown
      */
-    public List<Integer> getAllIDs(String groupName) {
+    public Integer getId(String groupName) {
         if (groupName == null) {
             return null;
         }
         try (Connection connection = db.getConnection();
-             PreparedStatement getGroupIDs = connection.prepareStatement(GroupManagerDao.getGroupIDs);) {
-            getGroupIDs.setString(1, groupName);
-            try (ResultSet set = getGroupIDs.executeQuery();) {
-                List<Integer> ids = new ArrayList<>();
-
-                while (set.next()) {
-                    ids.add(set.getInt(1));
+             PreparedStatement getGroupID = connection.prepareStatement(GroupManagerDao.getGroupID);) {
+            getGroupID.setString(1, groupName);
+            try (ResultSet set = getGroupID.executeQuery();) {
+                if (set.next()) {
+                    return set.getInt(1);
                 }
-
-                return ids;
             } catch (SQLException se) {
-                logger.log(Level.WARNING, "Unable to fully load group ID set", se);
+                logger.log(Level.WARNING, "Unable to load group ID", se);
             }
         } catch (SQLException se) {
-            logger.log(Level.WARNING, "Unable to prepare query to fully load group ID set", se);
+            logger.log(Level.WARNING, "Unable to prepare query to load group ID", se);
         }
         return null;
     }
