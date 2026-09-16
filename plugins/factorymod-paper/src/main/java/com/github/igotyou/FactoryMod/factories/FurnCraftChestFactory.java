@@ -774,7 +774,7 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
 
     public void upgrade(String name, List<IRecipe> recipes, ItemStack fuel, int fuelConsumptionIntervall,
                         int updateTime, int maximumHealth, int damageAmountPerDecayIntervall, long gracePeriod,
-                        double citadelBreakReduction) {
+                        double citadelBreakReduction, long decayIntervallMillis) {
         LoggingUtils.log("Upgrading " + getLogData() + " to " + name);
         pylonFactories.remove(this);
         deactivate();
@@ -784,7 +784,7 @@ public class FurnCraftChestFactory extends Factory implements IIOFInventoryProvi
         this.citadelBreakReduction = citadelBreakReduction;
         this.pm = new FurnacePowerManager(getFurnace(), fuel, fuelConsumptionIntervall);
         this.rm = new PercentageHealthRepairManager(maximumHealth, maximumHealth, 0, damageAmountPerDecayIntervall,
-            gracePeriod);
+            gracePeriod, decayIntervallMillis);
         if (!recipes.isEmpty()) {
             setRecipe(recipes.get(0));
         } else {

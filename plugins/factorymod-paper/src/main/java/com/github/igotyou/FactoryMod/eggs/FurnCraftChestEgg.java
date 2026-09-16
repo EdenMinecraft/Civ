@@ -29,10 +29,11 @@ public class FurnCraftChestEgg implements IFactoryEgg {
     private double returnRateOnDestruction;
     private double citadelBreakReduction;
     private ItemMap setupCost;
+    private long decayIntervallMillis;
 
     public FurnCraftChestEgg(String name, int updateTime,
                              List<IRecipe> recipes, ItemStack fuel,
-                             int fuelConsumptionIntervall, double returnRateOnDestruction, int maximumHealth, long breakGracePeriod, int healthPerDamagePeriod, double citadelBreakReduction, ItemMap setupCost) {
+                             int fuelConsumptionIntervall, double returnRateOnDestruction, int maximumHealth, long breakGracePeriod, int healthPerDamagePeriod, double citadelBreakReduction, ItemMap setupCost, long decayIntervallMillis) {
         this.name = name;
         this.updateTime = updateTime;
         this.recipes = recipes;
@@ -44,6 +45,7 @@ public class FurnCraftChestEgg implements IFactoryEgg {
         this.maximumHealth = maximumHealth;
         this.citadelBreakReduction = citadelBreakReduction;
         this.setupCost = setupCost;
+        this.decayIntervallMillis = decayIntervallMillis;
     }
 
     @Override
@@ -52,7 +54,7 @@ public class FurnCraftChestEgg implements IFactoryEgg {
         FurnacePowerManager fpm = new FurnacePowerManager(fccs.getFurnace(),
             fuel, fuelConsumptionIntervall);
         FurnCraftChestInteractionManager fccim = new FurnCraftChestInteractionManager();
-        PercentageHealthRepairManager phrm = new PercentageHealthRepairManager(maximumHealth, maximumHealth, 0, healthPerDamagePeriod, breakGracePeriod);
+        PercentageHealthRepairManager phrm = new PercentageHealthRepairManager(maximumHealth, maximumHealth, 0, healthPerDamagePeriod, breakGracePeriod, decayIntervallMillis);
         FurnCraftChestFactory fccf = new FurnCraftChestFactory(fccim, phrm,
             fpm, fccs, updateTime, name, recipes, citadelBreakReduction, 0, 0, 0);
         fccim.setFactory(fccf);
@@ -112,7 +114,7 @@ public class FurnCraftChestEgg implements IFactoryEgg {
         FurnacePowerManager fpm = new FurnacePowerManager(fccs.getFurnace(),
             fuel, fuelConsumptionIntervall);
         FurnCraftChestInteractionManager fccim = new FurnCraftChestInteractionManager();
-        PercentageHealthRepairManager phrm = new PercentageHealthRepairManager(health, maximumHealth, breakTime, healthPerDamagePeriod, breakGracePeriod);
+        PercentageHealthRepairManager phrm = new PercentageHealthRepairManager(health, maximumHealth, breakTime, healthPerDamagePeriod, breakGracePeriod, decayIntervallMillis);
         List<IRecipe> currRecipes = new ArrayList<>();
         for (String recName : recipeStrings) {
             boolean found = false;
@@ -163,5 +165,9 @@ public class FurnCraftChestEgg implements IFactoryEgg {
 
     public double getCitadelBreakReduction() {
         return citadelBreakReduction;
+    }
+
+    public long getDecayIntervallMillis() {
+        return decayIntervallMillis;
     }
 }

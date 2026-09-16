@@ -69,7 +69,8 @@ public class SwitchListener implements Listener {
                 Entity vehicle = entity.getVehicle();
                 // TODO: This should be abstracted into CivModCore
                 if (vehicle == null
-                    || vehicle.getType() != EntityType.MINECART
+                    || (vehicle.getType() != EntityType.MINECART
+                        && vehicle.getType() != EntityType.FURNACE_MINECART)
                     || !(vehicle instanceof Minecart)) {
                     continue;
                 }

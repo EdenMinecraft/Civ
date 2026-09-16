@@ -182,19 +182,24 @@ public class FurnCraftChestInteractionManager implements IInteractionManager {
                 }
                 p.sendMessage(ChatColor.GOLD + "Currently selected recipe: " + fccf.getCurrentRecipe().getName());
                 p.sendMessage(ChatColor.GOLD + "Currently at " + fccf.getRepairManager().getHealth() + " health");
-                if (fccf.getRepairManager().inDisrepair()) {
-                    PercentageHealthRepairManager rm = ((PercentageHealthRepairManager) fccf.getRepairManager());
-                    long leftTime = rm.getGracePeriod() - (System.currentTimeMillis() - rm.getBreakTime());
-                    long months = leftTime / (60L * 60L * 24L * 30L * 1000L);
-                    long days = (leftTime - (months * 60L * 60L * 24L * 30L * 1000L)) / (60L * 60L * 24L * 1000L);
-                    long hours = (leftTime - (months * 60L * 60L * 24L * 30L * 1000L)
-                        - (days * 60L * 60L * 24L * 1000L)) / (60L * 60L * 1000L);
-                    String time = (months != 0 ? months + " months, " : "") + (days != 0 ? days + " days, " : "")
-                        + (hours != 0 ? hours + " hours" : "");
-                    if (time.equals("")) {
-                        time = " less than an hour";
+                if (fccf.getRepairManager() instanceof PercentageHealthRepairManager) {
+                    PercentageHealthRepairManager rm = (PercentageHealthRepairManager) fccf.getRepairManager();
+                    if (rm.inDisrepair()) {
+                        long leftTime = rm.getGracePeriod() - (System.currentTimeMillis() - rm.getBreakTime());
+                        p.sendMessage(ChatColor.GOLD + "It will break permanently in " + formatDuration(leftTime));
+                    } else {
+                        long timeUntilBreak = rm.getEstimatedMillisUntilBreak();
+                        if (timeUntilBreak < 0) {
+                            p.sendMessage(ChatColor.GOLD + "This factory does not decay");
+                        } else {
+                            double healthFraction = (double) rm.getRawHealth() / rm.getMaximumHealth();
+                            ChatColor timeColor = healthFraction >= (2.0 / 3.0) ? ChatColor.GREEN
+                                : healthFraction >= (1.0 / 3.0) ? ChatColor.YELLOW : ChatColor.RED;
+                            p.sendMessage(ChatColor.GOLD
+                                + "Estimated time left before it breaks (at current decay rate): "
+                                + timeColor + formatDuration(timeUntilBreak));
+                        }
                     }
-                    p.sendMessage(ChatColor.GOLD + "It will break permanently in " + time);
                 }
             }
 
@@ -215,6 +220,19 @@ public class FurnCraftChestInteractionManager implements IInteractionManager {
                 fccf.attemptToActivate(p, false);
             }
         }
+    }
+
+    /**
+     * Formats a duration in milliseconds as "X months, Y days, Z hours", omitting any unit that's zero.
+     */
+    private static String formatDuration(long millis) {
+        long months = millis / (60L * 60L * 24L * 30L * 1000L);
+        long days = (millis - (months * 60L * 60L * 24L * 30L * 1000L)) / (60L * 60L * 24L * 1000L);
+        long hours = (millis - (months * 60L * 60L * 24L * 30L * 1000L)
+            - (days * 60L * 60L * 24L * 1000L)) / (60L * 60L * 1000L);
+        String time = (months != 0 ? months + " months, " : "") + (days != 0 ? days + " days, " : "")
+            + (hours != 0 ? hours + " hours" : "");
+        return time.isEmpty() ? "less than an hour" : time;
     }
 
     private ComponableInventory buildRecipeInventory(Player p) {

@@ -85,6 +85,7 @@ public class ConfigParser {
     private int defaultHealth;
     private HashSet<String> forceRecipes;
     private boolean forceIncludeAll;
+    private long decayIntervallMillis;
 
     public ConfigParser(FactoryMod plugin) {
         this.plugin = plugin;
@@ -135,6 +136,7 @@ public class ConfigParser {
         int redstoneRecipeChange = config.getInt("redstone_recipe_change", 2);
         defaultBreakGracePeriod = parseTime(config.getString("default_break_grace_period"));
         defaultDamagePerBreakPeriod = config.getInt("default_decay_amount", 21);
+        decayIntervallMillis = parseTime(config.getString("decay_intervall"));
         long savingIntervall = parseTimeAsTicks(config.getString("saving_intervall", "15m"));
         forceIncludeAll = config.getBoolean("force_include_default", false);
         // save factories on a regular base, unless disabled
@@ -484,7 +486,7 @@ public class ConfigParser {
             setupCost = ConfigHelper.parseItemMap(config.getConfigurationSection("setupcost"));
         }
         FurnCraftChestEgg egg = new FurnCraftChestEgg(name, update, null, fuel, fuelIntervall, returnRate, health,
-            gracePeriod, healthPerDamageIntervall, citadelBreakReduction, setupCost);
+            gracePeriod, healthPerDamageIntervall, citadelBreakReduction, setupCost, decayIntervallMillis);
         recipeLists.put(egg, config.getStringList("recipes"));
         return egg;
     }

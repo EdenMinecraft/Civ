@@ -1,0 +1,18 @@
+name: AuraMagnet
+main: net.civeden.auramagnet.AuraMagnet
+version: ${version}
+author: TTastic
+api-version: 1.21
+depend: [ CivModCore ]
+description: Offhand hoe that magnetically pulls nearby crops, seeds, bamboo and sea pickles to the player.
+
+commands:
+  auramagnet:
+    description: AuraMagnet admin commands.
+    usage: /auramagnet give [wooden|stone|iron|golden|diamond|netherite]
+    permission: auramagnet.give
+
+permissions:
+  auramagnet.give:
+    description: Allows giving a test Aura Magnet Hoe.
+    default: op
