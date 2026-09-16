@@ -19,7 +19,10 @@ import org.bukkit.inventory.ItemStack;
 
 public class HorseStats extends SimpleHack<HorseStatsConfig> implements Listener {
 
-    private static final double INTERNAL_TO_METRES_PER_SECOND = 42.15778758471;
+    // Wiki horse top speed (14.57 b/s) divided by max movement-speed attribute (0.3375)
+    private static final double INTERNAL_TO_METRES_PER_SECOND = 43.17037037037037;
+    private static final double JUMP_GRAVITY = 0.08;
+    private static final double JUMP_DRAG = 0.98;
 
     public HorseStats(SimpleAdminHacks plugin, HorseStatsConfig config) {
         super(plugin, config);
@@ -44,8 +47,8 @@ public class HorseStats extends SimpleHack<HorseStatsConfig> implements Listener
             AttributeInstance attrSpeed = horse.getAttribute(Attribute.MOVEMENT_SPEED);
             event.getPlayer().sendMessage(String.format("%sHealth = %f, Speed = %fm/s, Jump height = %f blocks",
                 ChatColor.YELLOW,
-                attrHealth.getBaseValue(),
-                attrSpeed.getBaseValue() * INTERNAL_TO_METRES_PER_SECOND,
+                attrHealth.getValue(),
+                attrSpeed.getValue() * INTERNAL_TO_METRES_PER_SECOND,
                 jumpHeightInBlocks(horse.getAttribute(Attribute.JUMP_STRENGTH).getValue())));
             event.setCancelled(true);
         } else if (entity instanceof Strider) {
@@ -54,17 +57,25 @@ public class HorseStats extends SimpleHack<HorseStatsConfig> implements Listener
             AttributeInstance attrSpeed = strider.getAttribute(Attribute.MOVEMENT_SPEED);
             event.getPlayer().sendMessage(String.format("%sHealth = %f, Speed = %fm/s",
                 ChatColor.YELLOW,
-                attrHealth.getBaseValue(),
-                attrSpeed.getBaseValue() * INTERNAL_TO_METRES_PER_SECOND));
+                attrHealth.getValue(),
+                attrSpeed.getValue() * INTERNAL_TO_METRES_PER_SECOND));
             event.setCancelled(true);
         } else {
             return;
         }
     }
 
-    private double jumpHeightInBlocks(double x) {
-        // This is a curve-fitted formula, so not 100% accurate
-        return -0.1817584952 * x * x * x + 3.689713992 * x * x + 2.128599134 * x - 0.343930367;
+    // Simulate the actual jump: each tick the entity rises by its velocity, then
+    // velocity drops by gravity and is scaled by drag. Peak height is the sum of
+    // the upward velocities. The jump strength attribute is the initial velocity.
+    private double jumpHeightInBlocks(double jumpStrength) {
+        double height = 0.0;
+        double velocity = jumpStrength;
+        while (velocity > 0) {
+            height += velocity;
+            velocity = (velocity - JUMP_GRAVITY) * JUMP_DRAG;
+        }
+        return height;
     }
 
     @Override
