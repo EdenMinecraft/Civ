@@ -87,6 +87,10 @@ public class BridgeEventHandler {
 
     public void handleBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
+        if(!CastleGates.getCitadelManager().canBypass(event.getPlayer(), block.getLocation())){
+            return;
+        }
+
         BridgeManager.RemoveResult result = _bridgeManager.removeGear(new BlockCoord(block));
 
         if (result == BridgeManager.RemoveResult.Removed || result == BridgeManager.RemoveResult.RemovedWithLink) {
