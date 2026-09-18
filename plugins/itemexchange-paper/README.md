@@ -29,8 +29,22 @@ An exchange rule shows (almost) all of its information in its tooltip. To increa
 is used in place of the Bukkit material name and durability value, wherever possible.
 
 A single exchange rule is either an input rule, defining items that the shop accepts, or an output rule, defining items
-that the shop gives in return. A single exchange consists of one input rule and one output rule. These are paired by the
-order that they're held in the shop's inventory; the first input rule is matched to the first output rule and so on.
+that the shop gives in return. An exchange consists of one or more input rules followed by one or more output rules.
+These are grouped by the order that they're held in the shop's inventory: an unbroken run of input rules, followed by an
+unbroken run of output rules, forms a single exchange. The next input rule after an output rule begins the next
+exchange.
+
+This means the familiar input/output/input/output layout behaves exactly as it always has — the first input pairs with
+the first output, the second with the second, and so on. Placing several inputs in a row before the outputs creates an
+exchange that costs several different items at once, and placing several outputs in a row makes an exchange that pays
+out several different items at once.
+
+For example, a chest holding an input for 2 iron, an input for 1 diamond, an output for 1 sword, and an output for 1
+shield, in that order, is a single exchange: it takes 2 iron *and* 1 diamond together, and gives back a sword *and* a
+shield together. A buyer must have every input, and the shop must hold every output, or the exchange won't go through —
+nothing is ever partially traded.
+
+To trigger the exchange, punch the shop while holding any one of its inputs; the rest are taken from your inventory.
 
 ![Image showing an input exchange rule tooltip in a shop inventory.](http://i.imgur.com/rC77hfy.png)
 ![Image showing an output exchange rule tooltip in a shop inventory.](http://i.imgur.com/hPzVh9n.png)
@@ -139,15 +153,40 @@ any number of exchanges while only using one inventory slot.
 The order of all exchange rules inside a bulk exchange rule is determined by how the components were placed on the
 crafting grid. When merging bulk exchange rules, one is essentially appended to the other.
 
-When forming input and output pairs, all exchange rules in the shop are considered, regardless of whether the rule is
-part of a bulk exchange rule or not. The first input rule is matched to the first output rule, the second to the second
-and so on, even if they are not in the same bulk exchange rule.
+When forming exchanges, all exchange rules in the shop are considered, regardless of whether the rule is part of a bulk
+exchange rule or not. Rules are grouped into exchanges purely by their order, even if they are not in the same bulk
+exchange rule.
 
 As an example of that, a chest containing only an input rule for 1 stone, and a bulk rule that contains an input rule
-for 1 wood and an output rule for 1 charcoal, in that order, will have an exchange selling charcoal for stone. The wood
-input rule cannot be matched to anything, and won't be a part of any exchange.
+for 1 wood and an output rule for 1 charcoal, in that order, will have a single exchange selling charcoal for 1 stone
+and 1 wood together, since the two input rules sit next to each other ahead of the output.
 
 When a bulk exchange rule is dropped onto the ground, it splits into its component exchange rules.
+
+## Exchange size limits
+
+Because a bulk exchange rule can hold any number of rules in a single item, it is cheap to build an exchange with a
+very large number of inputs or outputs. Server admins can cap this in `config.yml`:
+
+```yaml
+tradeLimits:
+  maxInputs: 8
+  maxOutputs: 8
+```
+
+`maxInputs` and `maxOutputs` limit how many rules a single exchange may have. An exchange that exceeds either limit is
+treated as broken and won't work at all. It is never quietly trimmed — dropping an input would let a buyer underpay,
+and dropping an output would shortchange them.
+
+Because the rule items in a container still look perfectly normal, and a bulk rule hides its contents entirely, a
+disabled exchange is called out when the shop is punched: *"1 exchange exceeds this server's size limit and has been
+disabled."* This is shown even if every exchange in the shop was disabled, in which case the container no longer
+functions as a shop at all.
+
+Every input and output of an exchange is always listed in full when browsing, so a buyer can always see the whole price
+before paying it.
+
+Set either of these to `0` for no limit. Changes take effect on **/iereload** (or **/ier**) — no restart needed.
 
 ## Redstone support
 

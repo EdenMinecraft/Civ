@@ -33,6 +33,8 @@ public final class ShopRule implements Validation {
 
     private int currentTradeIndex;
 
+    private int oversizedTrades;
+
     @Override
     public boolean isValid() {
         if (CollectionUtils.isEmpty(this.trades)) {
@@ -66,6 +68,27 @@ public final class ShopRule implements Validation {
         return this.trades.get(this.currentTradeIndex);
     }
 
+    /**
+     * @return Returns true if any of this shop's exchanges were disabled for exceeding the configured size limits.
+     */
+    public boolean hasOversizedTrades() {
+        return this.oversizedTrades > 0;
+    }
+
+    /**
+     * Tells a player that some of this shop's exchanges have been disabled for being too large. Without this the shop
+     * would fail silently: an oversized exchange never enters the catalogue, so there's no gap in the listing to
+     * notice, and the rule items in the container still look perfectly normal.
+     */
+    public void warnAboutOversizedTrades(Player player) {
+        if (this.oversizedTrades < 1) {
+            return;
+        }
+        player.sendMessage(ChatColor.RED + (this.oversizedTrades == 1
+            ? "1 exchange exceeds this server's size limit and has been disabled."
+            : this.oversizedTrades + " exchanges exceed this server's size limit and have been disabled."));
+    }
+
     public TradeRule cycleTrades(boolean forward) {
         if (this.trades.isEmpty()) {
             return null;
@@ -86,17 +109,22 @@ public final class ShopRule implements Validation {
         }
         player.sendMessage(String.format("%s(%d/%d) exchanges present.",
             ChatColor.YELLOW, this.currentTradeIndex + 1, this.trades.size()));
-        for (String line : trade.getInput().getDisplayInfo()) {
-            player.sendMessage(line);
-        }
-        if (trade.getOutput() != null) {
-            for (String line : trade.getOutput().getDisplayInfo()) {
+        for (ExchangeRule input : trade.getInputs()) {
+            for (String line : input.getDisplayInfo()) {
                 player.sendMessage(line);
+            }
+        }
+        if (trade.hasOutputs()) {
+            for (ExchangeRule output : trade.getOutputs()) {
+                for (String line : output.getDisplayInfo()) {
+                    player.sendMessage(line);
+                }
             }
             PLUGIN.debug("[ShopRule] Calculating stock.");
             int stock = trade.calculateStock();
             player.sendMessage(ChatColor.YELLOW + "" + stock + " exchange" + (stock == 1 ? "" : "s") + " available.");
         }
+        warnAboutOversizedTrades(player);
     }
 
     // ------------------------------------------------------------
@@ -171,41 +199,52 @@ public final class ShopRule implements Validation {
         return found;
     }
 
+    /**
+     * Finishes off a gathered trade, keeping it if it's usable and otherwise noting why it was thrown away.
+     */
+    private void completeTrade(List<TradeRule> trades, TradeRule trade) {
+        if (trade.isValid()) {
+            trades.add(trade);
+        } else if (trade.isOversized()) {
+            this.oversizedTrades++;
+            PLUGIN.debug("[Resolve] Discarding oversized trade.");
+        }
+    }
+
+    /**
+     * Groups a shop's rules into trades. A trade is an unbroken run of input rules followed by an unbroken run of
+     * output rules, so an input that follows an output begins the next trade. This keeps the classic
+     * one-input-to-one-output layout working exactly as it always has, while allowing a trade to ask for several
+     * inputs and to pay out several outputs.
+     */
     private List<TradeRule> extractTradesFromInventory(Inventory inventory) {
         List<TradeRule> trades = Lists.newArrayList();
         List<ExchangeRule> rules = extractRulesFromInventory(inventory);
-        Type previousType = null;
         TradeRule currentTrade = new TradeRule(inventory);
-        // TODO: Future me should git gud and make this better and more readable... like seriously!
         for (ExchangeRule rule : rules) {
+            // A broken rule severs whatever trade was being gathered.
             if (rule == null || rule.isBroken()) {
-                previousType = null;
+                completeTrade(trades, currentTrade);
+                currentTrade = new TradeRule(inventory);
                 continue;
             }
             Type type = rule.getType();
             if (type == Type.INPUT) {
-                if (previousType != null) {
-                    if (currentTrade.isValid()) {
-                        trades.add(currentTrade);
-                        currentTrade = new TradeRule(inventory);
-                    }
-                } else {
+                // An input that follows an output starts the next trade.
+                if (currentTrade.hasOutputs()) {
+                    completeTrade(trades, currentTrade);
                     currentTrade = new TradeRule(inventory);
                 }
-                currentTrade.setInput(rule);
-                previousType = Type.INPUT;
+                currentTrade.addInput(rule);
             } else if (type == Type.OUTPUT) {
-                if (previousType != Type.INPUT) {
-                    previousType = Type.OUTPUT;
+                // An output with no preceding input has nothing to attach itself to.
+                if (currentTrade.getInputs().isEmpty()) {
                     continue;
                 }
-                currentTrade.setOutput(rule);
-                previousType = Type.OUTPUT;
+                currentTrade.addOutput(rule);
             }
         }
-        if (currentTrade.isValid()) {
-            trades.add(currentTrade);
-        }
+        completeTrade(trades, currentTrade);
         return trades;
     }
 
