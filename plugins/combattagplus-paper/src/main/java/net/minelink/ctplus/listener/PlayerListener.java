@@ -1,7 +1,12 @@
 package net.minelink.ctplus.listener;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextReplacementConfig;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.minelink.ctplus.CombatTagPlus;
 import net.minelink.ctplus.Tag;
 import net.minelink.ctplus.event.CombatLogEvent;
@@ -10,7 +15,6 @@ import net.minelink.ctplus.event.SafeLogoutEvent;
 import net.minelink.ctplus.task.SafeLogoutTask;
 import net.minelink.ctplus.task.TagUpdateTask;
 
-import org.apache.commons.lang3.text.WordUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -105,9 +109,9 @@ public final class PlayerListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void broadcastKill(PlayerDeathEvent event) {
         // Do nothing if both kill messages are blank
-        String message = plugin.getSettings().getKillMessage();
-        String messageItem = plugin.getSettings().getKillMessageItem();
-        if (message.isEmpty() && messageItem.isEmpty()) return;
+        List<String> messages = plugin.getSettings().getKillMessages();
+        List<String> messagesItem = plugin.getSettings().getKillMessagesItem();
+        if (messages.isEmpty() && messagesItem.isEmpty()) return;
 
         Player player = event.getEntity();
         UUID playerId = player.getUniqueId();
@@ -136,18 +140,36 @@ public final class PlayerListener implements Listener {
             attacker = tag.getVictimName();
         }
 
-        // Use item-based kill message?
-        ItemStack item = p.getItemInHand();
-        if (item.getType() != Material.AIR) {
-            String name = WordUtils.capitalizeFully(item.getType().name().replace("_", " "));
-            message = messageItem.replace("{item}", name);
+        // Determine item name and build hoverable item component
+        Component itemComponent = null;
+        ItemStack item = p.getInventory().getItemInMainHand();
+        if (item != null && item.getType() != Material.AIR) {
+            Component itemName = item.hasItemMeta() && item.getItemMeta().hasDisplayName()
+                ? item.getItemMeta().displayName()
+                : Component.translatable(item.getType());
+            itemComponent = itemName.hoverEvent(item.asHoverEvent());
         }
 
-        // Insert victim and attacker names into message
-        message = message.replace("{victim}", victim).replace("{attacker}", attacker);
+        // Choose a random message from the appropriate pool
+        String template;
+        if (itemComponent != null && !messagesItem.isEmpty()) {
+            template = messagesItem.get(ThreadLocalRandom.current().nextInt(messagesItem.size()));
+        } else if (!messages.isEmpty()) {
+            template = messages.get(ThreadLocalRandom.current().nextInt(messages.size()));
+        } else {
+            return;
+        }
+
+        Component killMessage = LegacyComponentSerializer.legacyAmpersand().deserialize(template)
+            .replaceText(TextReplacementConfig.builder().matchLiteral("{victim}").replacement(Component.text(victim)).build())
+            .replaceText(TextReplacementConfig.builder().matchLiteral("{attacker}").replacement(Component.text(attacker)).build());
+
+        if (itemComponent != null) {
+            killMessage = killMessage.replaceText(TextReplacementConfig.builder().matchLiteral("{item}").replacement(itemComponent).build());
+        }
 
         // Broadcast kill message
-        Bukkit.broadcast(message, "ctplus.notify.kill");
+        Bukkit.broadcast(killMessage, "ctplus.notify.kill");
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)

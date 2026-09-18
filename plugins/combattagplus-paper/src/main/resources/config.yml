@@ -114,11 +114,19 @@ generate-random-name: true
 # This is the prefix to use for the random name. 12 characters max.
 random-name-prefix: PvPLogger
 
-# This message is displayed when a player is killed by another player. Set this to '' to display nothing.
-kill-message: '&8&l>> &c{victim} was slain by {attacker}'
+# This pool of messages is displayed when a player is killed by another player. Set this to [] to display nothing. One is chosen randomly.
+kill-messages:
+  - '&8&l>> &c{victim} was slain by {attacker}'
+  - '&8&l>> &c{victim} was taken down by {attacker}'
+  - '&8&l>> &c{victim} got wrecked by {attacker}'
+  - '&8&l>> &c{victim} was obliterated by {attacker}'
 
-# Same as above, this is displayed when a player is killed by another player with an item in hand.
-kill-message-item: '&8&l>> &c{victim} was slain by {attacker} with a {item}'
+# This pool of messages is displayed when a player is killed by another player with an item in hand. {item} will be replaced with the item name. One is chosen randomly.
+kill-messages-item:
+  - '&8&l>> &c{victim} was slain by {attacker} with {item}'
+  - '&8&l>> &c{victim} was taken down by {attacker} using {item}'
+  - '&8&l>> &c{victim} got wrecked by {attacker} wielding {item}'
+  - '&8&l>> &c{victim} was obliterated by {attacker} with {item}'
 
 # Enables BarAPI integration for displaying a boss bar counting down with the remaining tag time.
 barapi: true

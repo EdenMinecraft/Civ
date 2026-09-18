@@ -1,8 +1,10 @@
 package vg.civcraft.mc.civchat2.listeners;
 
 import java.util.Optional;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -42,35 +44,62 @@ public class KillListener implements Listener {
         if (!settingsMan.getSendOwnKills(killer.getUniqueId())) {
             return;
         }
-        String msg;
         ItemStack item = killer.getInventory().getItemInMainHand();
-        String victimFormattedName = String.format("%s%s", ChatColor.ITALIC, victim.getDisplayName());
-        String killerFormattedName = String.format("%s%s", ChatColor.ITALIC, killer.getDisplayName());
-
+        Component killerComponent = Component.text(killer.getDisplayName(), NamedTextColor.DARK_GRAY);
+        Component victimComponent = Component.text(victim.getDisplayName(), NamedTextColor.DARK_GRAY);
+        Component verb = Component.text("killed", NamedTextColor.DARK_GRAY);
+        Component accent = Component.text("> ", NamedTextColor.DARK_GRAY).decorate(TextDecoration.BOLD);
+        Component killMessage;
         if (item == null || MaterialUtils.isAir(item.getType())) {
-            msg = String.format("%s%s %swas killed by %s %sby hand", ChatColor.DARK_GRAY, victimFormattedName,
-                ChatColor.DARK_GRAY, killerFormattedName, ChatColor.DARK_GRAY);
+            killMessage = Component.text()
+                .append(accent)
+                .append(killerComponent)
+                .append(Component.space())
+                .append(verb)
+                .append(Component.space())
+                .append(victimComponent)
+                .append(Component.space())
+                .append(Component.text("by hand", NamedTextColor.DARK_GRAY))
+                .build();
         } else {
-            String itemName = ItemUtils.getItemName(item);
-            String displayName = ItemUtils.getDisplayName(item);
             Boolean hasWordBank = Optional.ofNullable(ItemUtils.getItemMeta(item))
                 .map(r -> r.displayName())
                 .map(f -> f.children().size() > 0)
                 .orElse(false);
+
+            Component itemName = item.hasItemMeta() && item.getItemMeta().hasDisplayName()
+                ? item.getItemMeta().displayName()
+                : Component.translatable(item.getType());
+
+            String connector;
             if (!hasWordBank) {
-                displayName = String.format("with a %s", itemName);
+                connector = "with";
             } else {
-                String killMessageFormat = settingsMan.getKillMessageFormat(killer.getUniqueId()).simpleDescription;
-                if (killMessageFormat.isBlank()) {
-                    displayName = String.format("%s%s", killMessageFormat, displayName);
-                } else {
-                    displayName = String.format("%s %s", killMessageFormat, displayName);
-                }
+                connector = settingsMan.getKillMessageFormat(killer.getUniqueId()).simpleDescription;
             }
 
-            msg = String.format("%s%s %swas killed by %s %s%s", ChatColor.DARK_GRAY, victimFormattedName,
-                ChatColor.DARK_GRAY, killerFormattedName, ChatColor.DARK_GRAY, displayName);
+            Component itemPhrase;
+            if (connector.isBlank()) {
+                itemPhrase = itemName;
+            } else {
+                itemPhrase = Component.text(connector + " ")
+                    .append(itemName);
+            }
+            itemPhrase = itemPhrase.color(NamedTextColor.DARK_GRAY)
+                .hoverEvent(item.asHoverEvent());
+
+            killMessage = Component.text()
+                .append(accent)
+                .append(killerComponent)
+                .append(Component.space())
+                .append(verb)
+                .append(Component.space())
+                .append(victimComponent)
+                .append(Component.space())
+                .append(itemPhrase)
+                .build();
         }
+
         Location killLoc = victim.getLocation();
         for (Player p : Bukkit.getOnlinePlayers()) {
             Location loc = p.getLocation();
@@ -87,7 +116,7 @@ public class KillListener implements Listener {
                 && dao.isIgnoringPlayer(p.getUniqueId(), killer.getUniqueId())) {
                 continue;
             }
-            p.sendMessage(msg);
+            p.sendMessage(killMessage);
         }
     }
 
