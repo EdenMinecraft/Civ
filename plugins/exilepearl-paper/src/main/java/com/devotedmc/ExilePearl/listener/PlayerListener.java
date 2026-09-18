@@ -1,6 +1,5 @@
 package com.devotedmc.ExilePearl.listener;
 
-import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import com.devotedmc.ExilePearl.ExilePearl;
 import com.devotedmc.ExilePearl.ExilePearlApi;
 import com.devotedmc.ExilePearl.ExileRule;
@@ -27,7 +26,9 @@ import java.util.UUID;
 import java.util.logging.Level;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.minelink.ctplus.Npc;
 import net.minelink.ctplus.compat.base.NpcIdentity;
+import net.minelink.ctplus.event.NpcDespawnEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -268,19 +269,17 @@ public class PlayerListener implements Listener, Configurable {
      *
      * @param event The event args
      */
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player imprisoner = event.getPlayer();
 
-        // Don't drop if the player is tagged
-        if (pearlApi.isPlayerTagged(imprisoner.getUniqueId())) {
+        if (pearlApi.wouldSpawnNpc(imprisoner)) {
             return;
         }
 
         Location loc = imprisoner.getLocation();
         Inventory inv = imprisoner.getInventory();
         removePearlFromInventory(inv, loc);
-        imprisoner.saveData();
     }
 
     public void removePearlFromInventory(Inventory inv, Location loc) {
@@ -296,17 +295,14 @@ public class PlayerListener implements Listener, Configurable {
         }
     }
 
-    @EventHandler
-    public void onNPCDespawn(EntityRemoveFromWorldEvent event) {
-        Entity entity = event.getEntity();
-        if (!(entity instanceof Player player)) {
-            return;
-        }
-        if (!entity.hasMetadata("NPC")) {
+    @EventHandler(priority = EventPriority.LOW)
+    public void onNPCDespawn(NpcDespawnEvent event) {
+        Npc npc = event.getNpc();
+        Player player = npc.getEntity();
+        if (Bukkit.getPlayer(npc.getIdentity().getId()) != null) {
             return;
         }
         removePearlFromInventory(player.getInventory(), player.getLocation());
-        player.saveData();
     }
 
     /**
@@ -1311,8 +1307,8 @@ public class PlayerListener implements Listener, Configurable {
             ItemStack resultItem = new ItemStack(Material.STONE_BUTTON, 1);
             ItemMeta im = resultItem.getItemMeta();
             // TODO: This should use the new enchantment glint component, but because exilepearl
-			//  depends on the unbreaking enchantment to determine whether or not something is a pearl (why?????), it does not
-			im.addEnchant(Enchantment.UNBREAKING, 1, true);
+            //  depends on the unbreaking enchantment to determine whether or not something is a pearl (why?????), it does not
+            im.addEnchant(Enchantment.UNBREAKING, 1, true);
             im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             resultItem.setItemMeta(im);
 

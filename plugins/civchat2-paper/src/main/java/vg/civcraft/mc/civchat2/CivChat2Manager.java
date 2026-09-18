@@ -53,8 +53,8 @@ public class CivChat2Manager {
     // chatChannels in hashmap with (Player 1 name, player 2 name)
     private HashMap<UUID, UUID> chatChannels;
 
-    // groupChatChannels have (Player, Group)
-    private final HashMap<UUID, Group> groupChatChannels;
+    // groupChatChannels have (Player, Group name)
+    private final HashMap<UUID, String> groupChatChannels;
 
     // replyList has (playerName, whotoreplyto)
     private final HashMap<UUID, UUID> replyList;
@@ -76,8 +76,6 @@ public class CivChat2Manager {
     private String filterRelayGroup;
 
     private int muteTimeSeconds;
-
-    private Group modsGroup;
 
     private final StarManager starManager;
 
@@ -229,7 +227,7 @@ public class CivChat2Manager {
 
 
         long mutedUntil = instance.getCivChat2SettingsManager().getGlobalChatMuteSetting().getValue(sender);
-        Group targetChatGroup = groupChatChannels.get(sender.getUniqueId());
+        Group targetChatGroup = getGroupChatting(sender);
         if (mutedUntil > System.currentTimeMillis()) {
             if (targetChatGroup == null || targetChatGroup.getName().equals(instance.getPluginConfig().getGlobalChatGroupName())) {
                 sender.sendMessage(String.format(ChatStrings.globalMuted, TextUtil.formatDuration(mutedUntil - System.currentTimeMillis())));
@@ -416,7 +414,7 @@ public class CivChat2Manager {
         Preconditions.checkNotNull(player, "player");
         Preconditions.checkNotNull(group, "group");
 
-        groupChatChannels.put(player.getUniqueId(), group);
+        groupChatChannels.put(player.getUniqueId(), group.getName());
         scoreboardHUD.updateScoreboardHUD(player);
     }
 
@@ -574,7 +572,15 @@ public class CivChat2Manager {
 
         Preconditions.checkNotNull(player, "player");
 
-        return groupChatChannels.get(player.getUniqueId());
+        String groupName = groupChatChannels.get(player.getUniqueId());
+        if (groupName == null) {
+            return null;
+        }
+        Group group = GroupManager.getGroup(groupName);
+        if (group == null) {
+            removeGroupChat(player);
+        }
+        return group;
     }
 
     public String parse(String text) {

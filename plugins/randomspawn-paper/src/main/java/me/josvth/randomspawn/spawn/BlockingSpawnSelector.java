@@ -42,6 +42,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
     protected CompletableFuture<Location> getRandomSpawnLocationAsync(World world, boolean block) {
         String worldName = world.getName();
         Set<Material> blacklist = getMaterialBlackList(worldName);
+        Set<String> biomeBlacklist = getBiomeBlackList(worldName);
         if (yamlHandler.worlds.getBoolean(worldName + ".spawnbyplayer")) {
             List<Player> playersOnline = world.getPlayers();
 
@@ -54,7 +55,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
                 double exclusionRadius = yamlHandler.worlds.getDouble(worldName + ".spawnbyplayerarea.exclusionradius",
                     0);
 
-                return chooseSpawn(radius, exclusionRadius, spawnNear, blacklist, block);
+                return chooseSpawn(radius, exclusionRadius, spawnNear, blacklist, biomeBlacklist, block);
             }
         }
 
@@ -69,14 +70,16 @@ public class BlockingSpawnSelector implements SpawnSelector {
             int thickness = yamlHandler.worlds.getInt(worldName + ".spawnarea.thickness", 0);
 
             // square can block too bad (TODO fix)
-            ret = CompletableFuture.completedFuture(chooseSpawn(world, xmin, xmax, zmin, zmax, thickness, blacklist, true));
+            ret = CompletableFuture.completedFuture(chooseSpawn(world, xmin, xmax, zmin, zmax, thickness,
+                blacklist, biomeBlacklist, true));
         } else if (type.equalsIgnoreCase("circle")) {
             double exclusionRadius = yamlHandler.worlds.getDouble(worldName + ".spawnarea.exclusionradius", 0);
             double radius = yamlHandler.worlds.getDouble(worldName + ".spawnarea.radius", 100);
             double xcenter = yamlHandler.worlds.getDouble(worldName + ".spawnarea.xcenter", 0);
             double zcenter = yamlHandler.worlds.getDouble(worldName + ".spawnarea.zcenter", 0);
 
-            ret = chooseSpawn(radius, exclusionRadius, new Location(world, xcenter, 0, zcenter), blacklist, block);
+            ret = chooseSpawn(radius, exclusionRadius, new Location(world, xcenter, 0, zcenter), blacklist,
+                biomeBlacklist, block);
         } else {
             return CompletableFuture.completedFuture(null);
         }
@@ -88,6 +91,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
             ret = ret.thenCompose(location -> {
                 BastionBlockManager bm = Bastion.getBastionManager();
                 if (bm != null) {
+                    if (!bm.getBlockingBastions(location, b -> b.getType().isBlockLiquids()).isEmpty()) {
                     boolean isBlocking = false;
                     for(BastionBlock bastionBlock : bm.getBlockingBastions(location)){
                         if(!excludedBastionTypes.contains(bastionBlock.getType().getName())){
@@ -131,6 +135,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
         }
 
         Set<Material> blacklist = getMaterialBlackList(world.getName());
+        Set<String> biomeBlacklist = getBiomeBlackList(world.getName());
 
         // For each potential spawn location ...
         ConfigurationSection spawnpoints = yamlHandler.worlds.getConfigurationSection(worldName + ".spawnpoints");
@@ -141,23 +146,30 @@ public class BlockingSpawnSelector implements SpawnSelector {
         List<String> keys = new ArrayList<>(spawnpoints.getKeys(false));
         Collections.shuffle(keys, random);
 
-        return getSpawnPoint(new AtomicInteger(0), keys, spawnpoints, world, blacklist, block);
+        return getSpawnPoint(new AtomicInteger(0), keys, spawnpoints, world, blacklist, biomeBlacklist, block);
     }
 
-    private CompletableFuture<Location> getSpawnPoint(AtomicInteger index, List<String> keys, ConfigurationSection spawnpoints, World world, Set<Material> blacklist, boolean block) {
-        return getSpawnPointAttempt(spawnpoints, keys.get(index.get()), world, blacklist, block).thenCompose(location -> {
-            if (location == null) {
-                if (index.incrementAndGet() >= keys.size()) {
-                    return CompletableFuture.completedFuture(null);
+    private CompletableFuture<Location> getSpawnPoint(AtomicInteger index, List<String> keys,
+                                                       ConfigurationSection spawnpoints, World world,
+                                                       Set<Material> blacklist, Set<String> biomeBlacklist,
+                                                       boolean block) {
+        return getSpawnPointAttempt(spawnpoints, keys.get(index.get()), world, blacklist, biomeBlacklist, block)
+            .thenCompose(location -> {
+                if (location == null) {
+                    if (index.incrementAndGet() >= keys.size()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    return getSpawnPointAttempt(spawnpoints, keys.get(index.get()), world, blacklist, biomeBlacklist,
+                        block);
+                } else {
+                    return CompletableFuture.completedFuture(location);
                 }
-                return getSpawnPointAttempt(spawnpoints, keys.get(index.get()), world, blacklist, block);
-            } else {
-                return CompletableFuture.completedFuture(location);
-            }
-        });
+            });
     }
 
-    private CompletableFuture<Location> getSpawnPointAttempt(ConfigurationSection spawnpoints, String label, World world, Set<Material> blacklist, boolean block) {
+    private CompletableFuture<Location> getSpawnPointAttempt(ConfigurationSection spawnpoints, String label,
+                                                            World world, Set<Material> blacklist,
+                                                            Set<String> biomeBlacklist, boolean block) {
         ConfigurationSection spawnpoint = spawnpoints.getConfigurationSection(label);
         Location location = new Location(world, spawnpoint.getDouble("x"), spawnpoint.getDouble("y"),
             spawnpoint.getDouble("z"));
@@ -177,7 +189,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
         if (!skip) {
             // Now pick a location to spawn the player.
             return chooseSpawn(spawnpoint.getDouble("radius"), spawnpoint.getDouble("exclusion"),
-                location, blacklist, block);
+                location, blacklist, biomeBlacklist, block);
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -193,20 +205,26 @@ public class BlockingSpawnSelector implements SpawnSelector {
         });
     }
 
-    private CompletableFuture<Vector> chooseSpawnAttempt(boolean block, AtomicInteger attempts, double radius, double exclusionRadius, Location center, Set<Material> blacklist) {
-        return chooseOneSpawn(block, radius, exclusionRadius, center, blacklist).thenCompose(validSpawn -> {
-            if (validSpawn == null) {
-                if (attempts.decrementAndGet() <= 0) {
-                    return CompletableFuture.completedFuture(null);
+    private CompletableFuture<Vector> chooseSpawnAttempt(boolean block, AtomicInteger attempts, double radius,
+                                                         double exclusionRadius, Location center,
+                                                         Set<Material> blacklist, Set<String> biomeBlacklist) {
+        return chooseOneSpawn(block, radius, exclusionRadius, center, blacklist, biomeBlacklist)
+            .thenCompose(validSpawn -> {
+                if (validSpawn == null) {
+                    if (attempts.decrementAndGet() <= 0) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    return chooseSpawnAttempt(block, attempts, radius, exclusionRadius, center, blacklist,
+                        biomeBlacklist);
+                } else {
+                    return CompletableFuture.completedFuture(validSpawn);
                 }
-                return chooseSpawnAttempt(block, attempts, radius, exclusionRadius, center, blacklist);
-            } else {
-                return CompletableFuture.completedFuture(validSpawn);
-            }
-        });
+            });
     }
 
-    private CompletableFuture<Vector> chooseOneSpawn(boolean block, double radius, double exclusionRadius, Location center, Set<Material> blacklist) {
+    private CompletableFuture<Vector> chooseOneSpawn(boolean block, double radius, double exclusionRadius,
+                                                     Location center, Set<Material> blacklist,
+                                                     Set<String> biomeBlacklist) {
         // Uniformly distributed in "annulus". Explanation: https://forum.unity.com/threads/random-point-within-circle-with-min-max-radius.597523/#post-8524934
         final double ex2 = exclusionRadius * exclusionRadius;
         final double r2 = radius * radius;
@@ -216,18 +234,19 @@ public class BlockingSpawnSelector implements SpawnSelector {
         final double x = Math.round(center.getX() + Math.cos(phi) * r);
         final double z = Math.round(center.getZ() + Math.sin(phi) * r);
 
-        return getValidY(center.getWorld(), x, z, blacklist, block).thenApply(y -> y == null ? null : new Vector(x, y, z));
+        return getValidY(center.getWorld(), x, z, blacklist, biomeBlacklist, block)
+            .thenApply(y -> y == null ? null : new Vector(x, y, z));
     }
 
     private Location chooseSpawn(World world, double xmin, double xmax, double zmin, double zmax, double thickness,
-                                 Set<Material> blacklist, boolean block) {
+                                 Set<Material> blacklist, Set<String> biomeBlacklist, boolean block) {
 
         if (thickness <= 0) {
             for (int attempts = 1000; --attempts > 0; ) {
                 final double x = xmin + Math.random() * (xmax - xmin + 1);
                 final double z = zmin + Math.random() * (zmax - zmin + 1);
 
-                final Double y = getValidY(world, x, z, blacklist, block).join();
+                final Double y = getValidY(world, x, z, blacklist, biomeBlacklist, block).join();
                 if (y == null) {
                     continue;
                 }
@@ -254,7 +273,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
                     z = zmax - borderOffset;
                 }
 
-                final Double y = getValidY(world, x, z, blacklist, block).join();
+                final Double y = getValidY(world, x, z, blacklist, biomeBlacklist, block).join();
                 if (y == null) {
                     continue;
                 }
@@ -276,6 +295,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
         final double x,
         final double z,
         final @NotNull Set<Material> blacklist,
+        final @NotNull Set<String> biomeBlacklist,
         boolean block
     ) {
         CompletableFuture<Chunk> chunkAtAsync = block
@@ -297,7 +317,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
                 feetBlock = floorBlock.getRelative(0, 1, 0);
                 headBlock = floorBlock.getRelative(0, 2, 0);
                 while (headBlock.getY() < netherMaxHeight) {
-                    if (isValidSpawnLocation(headBlock, feetBlock, floorBlock, blacklist)) {
+                    if (isValidSpawnLocation(headBlock, feetBlock, floorBlock, blacklist, biomeBlacklist)) {
                         return (double) feetBlock.getY();
                     }
                     final Block nextBlock = headBlock.getRelative(0, 1, 0);
@@ -319,7 +339,7 @@ public class BlockingSpawnSelector implements SpawnSelector {
                 feetBlock = headBlock.getRelative(0, -1, 0);
                 floorBlock = headBlock.getRelative(0, -2, 0);
                 while (floorBlock.getY() >= otherMinHeight) {
-                    if (isValidSpawnLocation(headBlock, feetBlock, floorBlock, blacklist)) {
+                    if (isValidSpawnLocation(headBlock, feetBlock, floorBlock, blacklist, biomeBlacklist)) {
                         return (double) feetBlock.getY();
                     }
                     final Block nextBlock = floorBlock.getRelative(0, -1, 0);
@@ -342,11 +362,17 @@ public class BlockingSpawnSelector implements SpawnSelector {
         final @NotNull Block headBlock,
         final @NotNull Block feetBlock,
         final @NotNull Block floorBlock,
-        final @NotNull Set<Material> blackListedMaterials
+        final @NotNull Set<Material> blackListedMaterials,
+        final @NotNull Set<String> blackListedBiomes
     ) {
         return floorBlock.isSolid() && !blackListedMaterials.contains(floorBlock.getType())
+            && !blackListedBiomes.contains(floorBlock.getBiome().getKey().asString())
             && !feetBlock.isSolid() && !blackListedMaterials.contains(feetBlock.getType())
             && !headBlock.isSolid() && !blackListedMaterials.contains(headBlock.getType());
+    }
+
+    private Set<String> getBiomeBlackList(String worldName) {
+        return new HashSet<>(yamlHandler.worlds.getStringList(worldName + ".spawnblacklistbiomes"));
     }
 
     private Set<Material> getMaterialBlackList(String worldName) {

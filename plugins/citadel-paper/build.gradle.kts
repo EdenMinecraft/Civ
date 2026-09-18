@@ -12,5 +12,5 @@ dependencies {
     compileOnly(project(":plugins:civmodcore-paper"))
     compileOnly(project(":plugins:namelayer-paper"))
 
-    compileOnly(libs.protocollib)
+    compileOnly(libs.packetevents.spigot)
 }

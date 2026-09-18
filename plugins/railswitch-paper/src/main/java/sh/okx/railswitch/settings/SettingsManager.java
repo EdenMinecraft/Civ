@@ -2,10 +2,18 @@ package sh.okx.railswitch.settings;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.bukkit.Bukkit;
+import java.util.UUID;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import sh.okx.railswitch.RailSwitchPlugin;
+import vg.civcraft.mc.civmodcore.players.scoreboard.bottom.BottomLine;
+import vg.civcraft.mc.civmodcore.players.scoreboard.bottom.BottomLineAPI;
+import vg.civcraft.mc.civmodcore.players.scoreboard.side.CivScoreBoard;
+import vg.civcraft.mc.civmodcore.players.scoreboard.side.ScoreBoardAPI;
+import vg.civcraft.mc.civmodcore.players.settings.PlayerSetting;
+import vg.civcraft.mc.civmodcore.players.settings.impl.DisplayLocationSetting;
 
 /**
  * Manages the initialisation and registration of menu settings.
@@ -17,8 +25,10 @@ public final class SettingsManager {
     private static DestinationSetting destSetting;
 
     private static ResetSetting resetSetting;
+    private static DisplayLocationSetting destDisplayLocation;
 
-    private static DestinationScoreboard scoreboard;
+    private static CivScoreBoard destScoreBoard;
+    private static BottomLine destBottomLine;
 
     /**
      * Initialise the settings manager. This should only be called within RailSwitch onEnable().
@@ -30,17 +40,31 @@ public final class SettingsManager {
         menu = new RailSwitchMenu();
         destSetting = new DestinationSetting(plugin);
         resetSetting = new ResetSetting(plugin, destSetting);
+        destDisplayLocation = new DisplayLocationSetting(plugin, DisplayLocationSetting.DisplayLocation.SIDEBAR,
+            "Dest Display Location", "destDisplayLocation", new ItemStack(Material.ARROW), "destination");
+
         // Register those elements
         menu.registerToParentMenu();
         menu.registerSetting(destSetting);
         menu.registerSetting(resetSetting);
+        menu.registerSetting(destDisplayLocation);
 
-        // Mirror the destination onto the sidebar scoreboard whenever it changes.
-        // setValue() fires listeners BEFORE storing the new value, so use newValue here, not getDestination().
-        scoreboard = new DestinationScoreboard();
-        destSetting.registerListener((uuid, setting, oldValue, newValue) -> {
-            if (scoreboard != null) {
-                scoreboard.update(Bukkit.getPlayer(uuid), newValue);
+        destScoreBoard = ScoreBoardAPI.createBoard("RailSwitchDestDisplay");
+        destBottomLine = BottomLineAPI.createBottomLine("RailSwitchDestDisplay", 4);
+
+        // update player ui if dest setting is changed
+        destSetting.registerListener((UUID uuid, PlayerSetting<String> setting, String oldValue, String newValue) -> {
+            Player player = plugin.getServer().getPlayer(uuid);
+            if (player != null) {
+                updateDestScoreboardHud(player);
+            }
+        });
+
+        // update player ui if scoreboard display location setting is changed
+        destDisplayLocation.registerListener((UUID uuid, PlayerSetting<String> setting, String oldValue, String newValue) -> {
+            Player player = plugin.getServer().getPlayer(uuid);
+            if (player != null) {
+                updateDestScoreboardHud(player);
             }
         });
     }
@@ -98,16 +122,26 @@ public final class SettingsManager {
         return value;
     }
 
-    /**
-     * Restores the player's destination line on the sidebar, e.g. when they log in.
-     * Reads the stored value directly because player settings are already loaded at join time.
-     *
-     * @param player The player whose destination line should be refreshed.
-     */
-    public static void restoreDestinationDisplay(Player player) {
-        if (scoreboard != null) {
-            scoreboard.update(player, getDestination(player));
+    public static void updateDestScoreboardHud(Player p) {
+        String dest = getDestination(p);
+        if (Strings.isNullOrEmpty(dest)) {
+            // remove if dest is empty
+            destScoreBoard.hide(p);
+            destBottomLine.removePlayer(p);
+        } else {
+            // set dest on hud
+            if (destDisplayLocation.showOnSidebar(p.getUniqueId())) {
+                destScoreBoard.set(p, ChatColor.GOLD + "Dest: " + ChatColor.AQUA + dest);
+            } else {
+                // remove if disabled as the dest might still be showing on the sidebar from before
+                destScoreBoard.hide(p);
+            }
+            if (destDisplayLocation.showOnActionbar(p.getUniqueId())) {
+                destBottomLine.updatePlayer(p, ChatColor.GOLD + "Dest: " + ChatColor.AQUA + dest);
+            } else {
+                // remove if disabled as the dest might still be showing on the actionbar from before
+                destBottomLine.removePlayer(p);
+            }
         }
     }
-
 }

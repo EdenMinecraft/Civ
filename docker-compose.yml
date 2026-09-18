@@ -8,8 +8,8 @@ services:
   #################
 
   proxy:
-    image: itzg/mc-proxy:java24
-    restart: on-failure
+    image: itzg/mc-proxy:java25
+    restart: no
     tty: true
     stdin_open: true
     depends_on:
@@ -17,8 +17,10 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
-      VELOCITY_VERSION: '3.4.0-SNAPSHOT'
+      VELOCITY_VERSION: '3.5.0-SNAPSHOT'
       TYPE: 'VELOCITY'
 
       REMOVE_OLD_MODS: 'TRUE'
@@ -30,9 +32,12 @@ services:
       CIV_POSTGRES_USERNAME: postgres
       CIV_POSTGRES_PASSWORD: postgres
 
+      CIV_RABBITMQ_HOST: rabbitmq
+      CIV_RABBITMQ_USERNAME: rabbitmq
+      CIV_RABBITMQ_PASSWORD: rabbitmq
+
       CIV_TIMEOUT_TIME: 3000000
       CIV_PVP_HOSTNAME: 'pvp.localhost'
-      CIV_GAMMA_HOSTNAME: 'mini.localhost'
       CIV_HOSTNAME: 'main.localhost'
 
       CIV_FORWARDING_SECRET: '1234'
@@ -40,15 +45,22 @@ services:
       CIV_MYSQL_HOST: mariadb
       CIV_MYSQL_USERNAME: mariadb
       CIV_MYSQL_PASSWORD: mariadb
+
+      JVM_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008
     ports:
       - "25565:25577"
+      - "5008:5008"
     volumes:
       - ./containers/data/proxy:/server
       - ./ansible/files/proxy-config:/config
       - ./ansible/build/proxy-plugins:/plugins
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
 
   paper:
-    image: itzg/minecraft-server:stable-java24-graalvm
+    image: itzg/minecraft-server:stable-java25
     restart: on-failure
     tty: true
     stdin_open: true
@@ -57,11 +69,13 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       TYPE: 'paper'
-      VERSION: '1.21.8'
+      VERSION: '1.21.11'
       EULA: 'TRUE'
-      PAPER_DOWNLOAD_URL: 'https://api.leafmc.one/v2/projects/leaf/versions/1.21.8/builds/156/downloads/leaf-1.21.8-156.jar'
+      PAPER_DOWNLOAD_URL: 'https://api.leafmc.one/v2/projects/leaf/versions/1.21.11/builds/166/downloads/leaf-1.21.11-166.jar'
 
       REMOVE_OLD_MODS: 'TRUE'
       COPY_CONFIG_DEST: '/data'
@@ -87,6 +101,10 @@ services:
 
       CIV_DATABASE_PREFIX: ''
 
+      CIV_RABBITMQ_HOST: rabbitmq
+      CIV_RABBITMQ_USERNAME: rabbitmq
+      CIV_RABBITMQ_PASSWORD: rabbitmq
+
       CIV_SECUREBOOT_ENABLE: 'false'
 
       JVM_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
@@ -99,8 +117,8 @@ services:
       - ./ansible/files/paper-config:/config
       - ./ansible/build/paper-plugins:/plugins
 
-  gamma:
-    image: itzg/minecraft-server:stable-java24-graalvm
+  zorweth:
+    image: itzg/minecraft-server:stable-java25
     restart: on-failure
     tty: true
     stdin_open: true
@@ -109,11 +127,13 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       TYPE: 'paper'
-      VERSION: '1.21.8'
+      VERSION: '1.21.11'
       EULA: 'TRUE'
-      PAPER_DOWNLOAD_URL: 'https://api.leafmc.one/v2/projects/leaf/versions/1.21.8/builds/156/downloads/leaf-1.21.8-156.jar'
+      PAPER_DOWNLOAD_URL: 'https://api.leafmc.one/v2/projects/leaf/versions/1.21.11/builds/166/downloads/leaf-1.21.11-166.jar'
 
       REMOVE_OLD_MODS: 'TRUE'
       COPY_CONFIG_DEST: '/data'
@@ -137,20 +157,24 @@ services:
       CIV_POSTGRES_USERNAME: postgres
       CIV_POSTGRES_PASSWORD: postgres
 
-      CIV_DATABASE_PREFIX: 'gamma_'
+      CIV_DATABASE_PREFIX: 'zorweth_'
 
-      JVM_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007
+      CIV_RABBITMQ_HOST: rabbitmq
+      CIV_RABBITMQ_USERNAME: rabbitmq
+      CIV_RABBITMQ_PASSWORD: rabbitmq
+
+      JVM_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5009
       CIV_WATCHDOG_TIMEOUT_TIME: 6000
       CIV_FORWARDING_SECRET: '1234'
     ports:
-      - "5007:5007"
+      - "5009:5009"
     volumes:
-      - ./containers/data/gamma:/data
-      - ./ansible/files/gamma-config:/config
-      - ./ansible/build/gamma-plugins:/plugins
+      - ./containers/data/zorweth:/data
+      - ./ansible/files/zorweth-config:/config
+      - ./ansible/build/zorweth-plugins:/plugins
 
   pvp:
-    image: itzg/minecraft-server:stable-java24-graalvm
+    image: itzg/minecraft-server:stable-java25
     restart: on-failure
     tty: true
     stdin_open: true
@@ -159,9 +183,11 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       TYPE: 'paper'
-      VERSION: '1.21.8'
+      VERSION: '1.21.11'
       EULA: 'TRUE'
       PAPER_CUSTOM_JAR: 'asp-server.jar'
 
@@ -187,6 +213,10 @@ services:
       CIV_POSTGRES_PASSWORD: postgres
 
       CIV_DATABASE_PREFIX: 'pvp_'
+
+      CIV_RABBITMQ_HOST: rabbitmq
+      CIV_RABBITMQ_USERNAME: rabbitmq
+      CIV_RABBITMQ_PASSWORD: rabbitmq
 
       JVM_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
       CIV_WATCHDOG_TIMEOUT_TIME: 6000
@@ -243,6 +273,23 @@ services:
     volumes:
       - ./containers/provisioning/postgres/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
       - ./containers/data/postgres:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3.9.16-management
+    restart: on-failure
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+      start_interval: 5s
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
 
   ##################
   ### Monitoring ###

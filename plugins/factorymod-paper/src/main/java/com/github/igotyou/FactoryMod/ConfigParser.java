@@ -35,6 +35,7 @@ import com.github.igotyou.FactoryMod.recipes.CompactingRecipe;
 import com.github.igotyou.FactoryMod.recipes.DecompactingRecipe;
 import com.github.igotyou.FactoryMod.recipes.DeterministicEnchantingRecipe;
 import com.github.igotyou.FactoryMod.recipes.DummyParsingRecipe;
+import com.github.igotyou.FactoryMod.recipes.ExtractOilRecipe;
 import com.github.igotyou.FactoryMod.recipes.FactoryMaterialReturnRecipe;
 import com.github.igotyou.FactoryMod.recipes.IRecipe;
 import com.github.igotyou.FactoryMod.recipes.InputRecipe;
@@ -55,7 +56,12 @@ import com.github.igotyou.FactoryMod.recipes.WordBankRecipe;
 import com.github.igotyou.FactoryMod.recipes.heliodor.HeliodorCreateRecipe;
 import com.github.igotyou.FactoryMod.recipes.heliodor.HeliodorFinishRecipe;
 import com.github.igotyou.FactoryMod.recipes.heliodor.HeliodorRefillRecipe;
+import com.github.igotyou.FactoryMod.recipes.heliodor.MeteorForecastRecipe;
 import com.github.igotyou.FactoryMod.recipes.scaling.ProductionRecipeModifier;
+import com.github.igotyou.FactoryMod.recipes.space.BuildRocketRecipe;
+import com.github.igotyou.FactoryMod.recipes.space.CheckResearchProgressRecipe;
+import com.github.igotyou.FactoryMod.recipes.space.OxygenRefillRecipe;
+import com.github.igotyou.FactoryMod.recipes.space.ResearchRecipe;
 import com.github.igotyou.FactoryMod.recipes.upgrade.CharcoalConsumptionUpgradeRecipe;
 import com.github.igotyou.FactoryMod.recipes.upgrade.SpeedUpgradeRecipe;
 import com.github.igotyou.FactoryMod.structures.BlockFurnaceStructure;
@@ -526,21 +532,21 @@ public class ConfigParser {
                 identifier = name;
             }
         }
+        String type = config.getString("type", (parentRecipe != null) ? parentRecipe.getTypeIdentifier() : null);
+        if (type == null) {
+            plugin.warning("No type specified for recipe at " + config.getCurrentPath() + ". Skipping the recipe.");
+            return null;
+        }
         String prodTime = config.getString("production_time");
-        if (prodTime == null && parentRecipe == null) {
+        if (prodTime == null && parentRecipe == null && !"EXTRACT_OIL".equals(type)) {
             plugin.warning("No production time specied for recipe " + name + ". Skipping it");
             return null;
         }
         int productionTime;
         if (parentRecipe == null) {
-            productionTime = parseTimeAsTicks(prodTime);
+            productionTime = "EXTRACT_OIL".equals(type) && prodTime == null ? 0 : parseTimeAsTicks(prodTime);
         } else {
             productionTime = parentRecipe.getProductionTime();
-        }
-        String type = config.getString("type", (parentRecipe != null) ? parentRecipe.getTypeIdentifier() : null);
-        if (type == null) {
-            plugin.warning("No type specified for recipe at " + config.getCurrentPath() + ". Skipping the recipe.");
-            return null;
         }
         // Force This Recipe to Show Up Even on Existing Factories (idempotently, ish)
         boolean forceAddExisting = config.getBoolean("forceInclude", forceIncludeAll);
@@ -1048,6 +1054,24 @@ public class ConfigParser {
                     break;
                 }
                 result = new HeliodorFinishRecipe(identifier, name, productionTime, input, inputCount, outputCountFinish);
+                break;
+            case "BUILD_ROCKET":
+                result = new BuildRocketRecipe(identifier, name, productionTime, input, config.getString("world"));
+                break;
+            case "RESEARCH":
+                int researchPhase = config.getInt("phase", 0);
+                if (researchPhase != 1 && researchPhase != 2) {
+                    plugin.warning("Invalid research phase for recipe " + name + ". Expected 1 or 2. Skipping it");
+                    result = null;
+                    break;
+                }
+                result = new ResearchRecipe(identifier, name, productionTime, input, researchPhase);
+                break;
+            case "CHECK_RESEARCH_PROGRESS":
+                result = new CheckResearchProgressRecipe(identifier, name, productionTime, input);
+                break;
+            case "METEOR_FORECAST":
+                result = new MeteorForecastRecipe(identifier, name, productionTime, input);
                 break;
             default:
                 plugin.severe("Could not identify type " + config.getString("type") + " as a valid recipe identifier");

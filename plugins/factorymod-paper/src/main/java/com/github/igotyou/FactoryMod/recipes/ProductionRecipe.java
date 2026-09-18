@@ -12,6 +12,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import vg.civcraft.mc.civmodcore.inventory.ClonedInventory;
+import vg.civcraft.mc.civmodcore.inventory.InventoryUtils;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemMap;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
 
@@ -21,11 +23,11 @@ import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
  */
 public class ProductionRecipe extends InputRecipe {
 
-    private ItemMap output;
-    private ItemStack recipeRepresentation;
-    private ProductionRecipeModifier modifier;
-    private Random rng;
-    private DecimalFormat decimalFormatting;
+    private final ItemMap output;
+    private final ItemStack recipeRepresentation;
+    private final ProductionRecipeModifier modifier;
+    private final Random rng;
+    private final DecimalFormat decimalFormatting;
 
     public ProductionRecipe(
         String identifier,
@@ -48,15 +50,6 @@ public class ProductionRecipe extends InputRecipe {
         return output;
     }
 
-    public ItemMap getAdjustedOutput(int rank, int runs) {
-        ItemMap im = output.clone();
-        if (modifier != null) {
-            im.multiplyContent(modifier.getFactor(rank, runs));
-            return im;
-        }
-        return im;
-    }
-
     public ItemMap getGuaranteedOutput(int rank, int runs) {
         if (modifier == null) {
             return output.clone();
@@ -67,10 +60,6 @@ public class ProductionRecipe extends InputRecipe {
             adjusted.addItemAmount(entry.getKey(), (int) (Math.floor(entry.getValue() * factor)));
         }
         return adjusted;
-    }
-
-    public int getCurrentMultiplier(Inventory i) {
-        return input.getMultiplesContainedIn(i);
     }
 
     @Override
@@ -91,7 +80,7 @@ public class ProductionRecipe extends InputRecipe {
         }
         int possibleRuns = input.getMultiplesContainedIn(i);
         for (ItemStack is : stacks) {
-            ItemUtils.addLore(is, ChatColor.GREEN + "Enough materials for " + String.valueOf(possibleRuns) + " runs");
+            ItemUtils.addLore(is, ChatColor.GREEN + "Enough materials for " + possibleRuns + " runs");
         }
         return stacks;
     }
@@ -104,16 +93,9 @@ public class ProductionRecipe extends InputRecipe {
         return createLoredStacksForInfo(i);
     }
 
-    public List<ItemStack> getGuaranteedOutput(Inventory i, FurnCraftChestFactory fccf) {
-        if (i == null) {
-            return input.getItemStackRepresentation();
-        }
-        return createLoredStacksForInfo(i);
-    }
-
     @Override
-    public EffectFeasibility evaluateEffectFeasibility(Inventory inputInv, Inventory outputInv) {
-        boolean isFeasible = input.fitsIn(outputInv);
+    public EffectFeasibility evaluateEffectFeasibility(Inventory inputInv, Inventory outputInv, FurnCraftChestFactory fccf) {
+        boolean isFeasible = InventoryUtils.safelyAddItemsToInventory(ClonedInventory.cloneInventory(outputInv), output.getItemStackRepresentation().toArray(new ItemStack[0]));
         String reasonSnippet = isFeasible ? null : "it ran out of storage space";
         return new EffectFeasibility(
             isFeasible,
@@ -140,8 +122,9 @@ public class ProductionRecipe extends InputRecipe {
             }
         }
         if (toRemove.isContainedIn(inputInv)) {
-            if (!toAdd.fitsIn(outputInv)) { // does not fit in chest
-                return false;
+            ItemStack[] itemsToAdd = toAdd.getItemStackRepresentation().toArray(new ItemStack[0]);
+            if (!InventoryUtils.safelyAddItemsToInventory(ClonedInventory.cloneInventory(outputInv), itemsToAdd)) {
+                return false; // does not fit in chest
             }
             if (toRemove.removeSafelyFrom(inputInv)) {
                 for (ItemStack is : toAdd.getItemStackRepresentation()) {
@@ -156,6 +139,14 @@ public class ProductionRecipe extends InputRecipe {
     @Override
     public Material getRecipeRepresentationMaterial() {
         return this.recipeRepresentation.getType();
+    }
+
+    @Override
+    public ItemStack getRecipeRepresentationType() {
+        ItemStack itemStack = new ItemStack(this.recipeRepresentation);
+        itemStack.setAmount(1);
+        itemStack.lore(null);
+        return itemStack;
     }
 
     public ProductionRecipeModifier getModifier() {

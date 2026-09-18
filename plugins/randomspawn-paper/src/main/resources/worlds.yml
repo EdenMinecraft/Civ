@@ -35,3 +35,5 @@ world:
     - 18
     - 51
     - 81
+  spawnblacklistbiomes:
+    - "minecraft:plains"

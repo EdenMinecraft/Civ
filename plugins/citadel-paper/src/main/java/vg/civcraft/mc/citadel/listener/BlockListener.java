@@ -1,9 +1,11 @@
 package vg.civcraft.mc.citadel.listener;
 
 import com.destroystokyo.paper.MaterialTags;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Set;
+import java.util.List;
+import java.util.Map;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.ChatColor;
@@ -18,6 +20,7 @@ import org.bukkit.block.data.Lightable;
 import org.bukkit.block.data.Openable;
 import org.bukkit.block.data.type.Comparator;
 import org.bukkit.block.data.type.Lectern;
+import org.bukkit.block.data.type.Shelf;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -28,6 +31,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockDispenseEvent;
+import org.bukkit.event.block.BlockFadeEvent;
 import org.bukkit.event.block.BlockFertilizeEvent;
 import org.bukkit.event.block.BlockFormEvent;
 import org.bukkit.event.block.BlockFromToEvent;
@@ -51,6 +56,9 @@ import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
 import vg.civcraft.mc.civmodcore.inventory.items.MaterialUtils;
 import vg.civcraft.mc.civmodcore.utilities.DoubleInteractFixer;
 import vg.civcraft.mc.civmodcore.world.WorldUtils;
+import vg.civcraft.mc.namelayer.GroupManager;
+import vg.civcraft.mc.namelayer.NameLayerAPI;
+import vg.civcraft.mc.namelayer.group.Group;
 
 public class BlockListener implements Listener {
 
@@ -294,6 +302,21 @@ public class BlockListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onCoralDry(BlockFadeEvent event) {
+        Material type = event.getBlock().getType();
+
+        // Corals includes everything (fans and coral) except blocks and wall fans, for some reason
+        if (!(Tag.CORALS.isTagged(type) ||
+              Tag.CORAL_BLOCKS.isTagged(type) ||
+              Tag.WALL_CORALS.isTagged(type))) return;
+
+        // Note: For non-blocks (fans, wall fans, corals) this will check the block it is placed on instead
+        if (ReinforcementLogic.getReinforcementProtecting(event.getBlock()) != null) {
+            event.setCancelled(true);
+        }
+    }
+
     // prevent opening reinforced things
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void openContainer(PlayerInteractEvent e) {
@@ -345,7 +368,7 @@ public class BlockListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void preventBypassChestAccess(BlockPlaceEvent e) {
         Material mat = e.getBlock().getType();
-        if (mat != Material.CHEST && mat != Material.TRAPPED_CHEST) {
+        if (mat != Material.CHEST && mat != Material.TRAPPED_CHEST && !Tag.COPPER_CHESTS.isTagged(mat)) {
             return;
         }
         for (Block rel : WorldUtils.getPlanarBlockSides(e.getBlock(), true)) {
@@ -726,29 +749,121 @@ public class BlockListener implements Listener {
         if (type != Material.CHISELED_BOOKSHELF) {
             return;
         }
-        EquipmentSlot hand = pie.getHand();
-        if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) {
-            return;
-        }
-        ItemStack relevant;
         Player p = pie.getPlayer();
-        if (hand == EquipmentSlot.HAND) {
-            relevant = p.getInventory().getItemInMainHand();
-        } else {
-            relevant = p.getInventory().getItemInOffHand();
-        }
-        if (relevant.getType() != Material.AIR && !Tag.ITEMS_BOOKSHELF_BOOKS.isTagged(relevant.getType())) {
+        boolean hasItem = p.getInventory().getItemInMainHand().getType() != Material.AIR || p.getInventory().getItemInOffHand().getType() != Material.AIR;
+        if (p.isSneaking() && hasItem) {
             return;
         }
         Reinforcement rein = Citadel.getInstance().getReinforcementManager().getReinforcement(block);
-        if (rein == null) {
+        if (rein == null || rein.isInsecure()) {
             return;
         }
         if (!rein.hasPermission(p, CitadelPermissionHandler.getModifyBlocks())) {
-            p.sendMessage(ChatColor.RED + "You do not have permission to " +
-                (Tag.ITEMS_BOOKSHELF_BOOKS.isTagged(relevant.getType()) ? "place books in this shelf" : "take books from this shelf"));
+            p.sendMessage(ChatColor.RED + "You do not have permission to interact with this bookshelf");
             pie.setCancelled(true);
         }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void preventShelfUse(PlayerInteractEvent pie) {
+        if (!pie.hasBlock()) {
+            return;
+        }
+        if (pie.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        Block block = pie.getClickedBlock();
+        Material type = block.getType();
+        if (!Tag.WOODEN_SHELVES.isTagged(type)) {
+            return;
+        }
+
+        Player p = pie.getPlayer();
+        boolean hasItem = p.getInventory().getItemInMainHand().getType() != Material.AIR || p.getInventory().getItemInOffHand().getType() != Material.AIR;
+        if (p.isSneaking() && hasItem) {
+            return;
+        }
+
+        List<Block> shelves = getConnectedShelves(block);
+        int reinforcementGroup = -1;
+        boolean unreinforced = false;
+        boolean insecure = true;
+
+        for (Block shelf : shelves) {
+            Reinforcement rein = Citadel.getInstance().getReinforcementManager().getReinforcement(shelf);
+            if (rein != null) {
+                if (unreinforced) {
+                    p.sendMessage(Component.text("Shelf is broken; a shelf is unreinforced.", NamedTextColor.RED));
+                    pie.setCancelled(true);
+                    return;
+                }
+                insecure &= rein.isInsecure();
+                if (reinforcementGroup == -1) {
+                    reinforcementGroup = rein.getGroupId();
+                } else if (reinforcementGroup != rein.getGroupId()) {
+                    p.sendMessage(Component.text("Shelf is broken; reinforcements are on different groups.", NamedTextColor.RED));
+                    pie.setCancelled(true);
+                    return;
+                }
+            } else {
+                if (reinforcementGroup != -1) {
+                    p.sendMessage(Component.text("Shelf is broken; a shelf is unreinforced.", NamedTextColor.RED));
+                    pie.setCancelled(true);
+                    return;
+                }
+                unreinforced = true;
+            }
+        }
+        if (!unreinforced && !insecure && !NameLayerAPI.getGroupManager().hasAccess(GroupManager.getGroup(reinforcementGroup), p.getUniqueId(), CitadelPermissionHandler.getModifyBlocks())) {
+            p.sendMessage(Component.text("You do not have permission to use this shelf", NamedTextColor.RED));
+            pie.setCancelled(true);
+        }
+    }
+
+    private List<Block> getConnectedShelves(Block block) {
+        Shelf shelf = (Shelf) block.getBlockData();
+        return switch (shelf.getSideChain()) {
+            case UNCONNECTED -> List.of(block);
+            case CENTER -> {
+                List<Block> shelves = new ArrayList<>();
+                shelves.add(block);
+                Block left = block.getRelative(shelf.getFacing().getModZ(), 0, shelf.getFacing().getModX());
+                if (left.getBlockData() instanceof Shelf) {
+                    shelves.add(left);
+                }
+                Block right = block.getRelative(-shelf.getFacing().getModZ(), 0, -shelf.getFacing().getModX());
+                if (right.getBlockData() instanceof Shelf) {
+                    shelves.add(right);
+                }
+                yield shelves;
+            }
+            case RIGHT -> {
+                List<Block> shelves = new ArrayList<>();
+                shelves.add(block);
+                Block centre = block.getRelative(shelf.getFacing().getModZ(), 0, shelf.getFacing().getModX());
+                if (centre.getBlockData() instanceof Shelf) {
+                    shelves.add(centre);
+                    Block left = centre.getRelative(shelf.getFacing().getModZ(), 0, shelf.getFacing().getModX());
+                    if (left.getBlockData() instanceof Shelf) {
+                        shelves.add(left);
+                    }
+                }
+                yield shelves;
+            }
+            case LEFT -> {
+                List<Block> shelves = new ArrayList<>();
+                shelves.add(block);
+                Block centre = block.getRelative(-shelf.getFacing().getModZ(), 0, -shelf.getFacing().getModX());
+                if (centre.getBlockData() instanceof Shelf) {
+                    shelves.add(centre);
+                    Block right = centre.getRelative(-shelf.getFacing().getModZ(), 0, -shelf.getFacing().getModX());
+                    if (right.getBlockData() instanceof Shelf) {
+                        shelves.add(right);
+                    }
+                }
+                yield shelves;
+            }
+        };
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)

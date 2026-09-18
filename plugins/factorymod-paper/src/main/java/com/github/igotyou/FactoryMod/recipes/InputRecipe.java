@@ -4,7 +4,6 @@ import com.github.igotyou.FactoryMod.FactoryMod;
 import com.github.igotyou.FactoryMod.factories.Factory;
 import com.github.igotyou.FactoryMod.factories.FurnCraftChestFactory;
 import com.github.igotyou.FactoryMod.utility.LoggingUtils;
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -17,7 +16,6 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import vg.civcraft.mc.civmodcore.chat.ChatUtils;
 import vg.civcraft.mc.civmodcore.inventory.CustomItem;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemMap;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemUtils;
@@ -151,11 +149,7 @@ public abstract class InputRecipe implements IRecipe {
      * whole in an item gui
      */
     public ItemStack getRecipeRepresentation() {
-        return getRecipeRepresentation(null);
-    }
-
-    public ItemStack getRecipeRepresentation(Inventory inputInv) {
-        ItemStack res = new ItemStack(getRecipeRepresentationMaterial());
+        ItemStack res = getRecipeRepresentationType();
         ItemMeta im = res.getItemMeta();
         im.setDisplayName(ChatColor.DARK_GREEN + getName());
         List<String> lore = new ArrayList<>();
@@ -193,6 +187,10 @@ public abstract class InputRecipe implements IRecipe {
     }
 
     public abstract Material getRecipeRepresentationMaterial();
+
+    public ItemStack getRecipeRepresentationType() {
+        return new ItemStack(getRecipeRepresentationMaterial());
+    }
 
     /**
      * Creates a list of ItemStack for a GUI representation. This list contains
@@ -264,16 +262,31 @@ public abstract class InputRecipe implements IRecipe {
 
     protected List<String> formatLore(ItemMap ingredients) {
         List<String> result = new ArrayList<>();
-        for (Entry<ItemStack, Integer> entry : ingredients.getItems().entrySet()) {
+        for (Entry<ItemStack, Integer> entry : ingredients.getAllItems().entrySet()) {
             if (entry.getValue() > 0) {
-                result.add(entry.getValue() + " " + formatIngredientName(entry.getKey()));
-            }
-        }
-        // Custom items should have their custom name displayed more prominently, their actual item type is irrelevant
-        for (Entry<String, Integer> entry : ingredients.getCustomItems().entrySet()) {
-            if (entry.getValue() > 0) {
-                ItemStack item = CustomItem.getCustomItem(entry.getKey());
-                result.add(entry.getValue() + " " + formatIngredientName(item));
+                ItemStack item = entry.getKey();
+                String customItemKey = CustomItem.getCustomItemKey(item);
+                if (customItemKey != null) {
+                    ItemStack customItem = CustomItem.getCustomItem(customItemKey);
+                    if (customItem != null && customItem.hasItemMeta() && customItem.getItemMeta().hasDisplayName()) {
+                        result.add(String.format("%s %s", entry.getValue(),
+                            StringUtils.abbreviate(customItem.getItemMeta().getDisplayName(), 35)));
+                    } else if (customItem != null && customItem.hasItemMeta() && customItem.getItemMeta().hasItemName()) {
+                        result.add(String.format("%s %s", entry.getValue(),
+                            StringUtils.abbreviate(customItem.getItemMeta().getItemName(), 35)));
+                    } else {
+                        result.add(String.format("%s %s", entry.getValue(), customItemKey));
+                    }
+                } else if (!item.hasItemMeta()) {
+                    result.add(entry.getValue() + " " + ItemUtils.getItemName(item));
+                } else {
+                    String lore = String.format("%s %s%s", entry.getValue(), ChatColor.ITALIC, ItemUtils.getItemName(item));
+                    if (item.getItemMeta().hasDisplayName()) {
+                        lore += String.format("%s [%s%1$s]", ChatColor.DARK_AQUA,
+                            StringUtils.abbreviate(item.getItemMeta().getDisplayName(), 20));
+                    }
+                    result.add(lore);
+                }
             }
         }
         return result;

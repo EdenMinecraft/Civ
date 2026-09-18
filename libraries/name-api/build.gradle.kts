@@ -8,7 +8,7 @@ version = "1.0.0"
 dependencies {
     api(libs.hikaricp)
     api(libs.configurate.yaml)
-    api("org.mariadb.jdbc:mariadb-java-client:3.5.6")
+    api(libs.mariadb.client)
     implementation(libs.slf4j.api)
 
     testImplementation(libs.bundles.junit)

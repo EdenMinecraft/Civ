@@ -16,7 +16,12 @@ dependencies {
     compileOnly(project(":plugins:banstick-paper"))
     compileOnly(project(":plugins:bastion-paper"))
     compileOnly(project(":plugins:exilepearl-paper"))
-    compileOnly("me.clip:placeholderapi:2.11.6")
+    compileOnly(project(":plugins:factorymod-paper"))
+    compileOnly(project(":plugins:zorweth-paper"))
+    compileOnly(libs.placeholderapi)
+    compileOnly(libs.packetevents.spigot)
 
     compileOnly(libs.protocollib)
+
+    compileOnly(files("../../ansible/src/paper-plugins/BreweryX-3.6.3.jar"))
 }

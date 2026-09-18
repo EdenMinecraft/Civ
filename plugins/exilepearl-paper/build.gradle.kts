@@ -18,12 +18,11 @@ dependencies {
     compileOnly(project(":plugins:banstick-paper"))
     compileOnly(project(":plugins:randomspawn-paper"))
 
-    compileOnly(files("../../ansible/src/paper-plugins/BreweryX-3.6.0.jar"))
-
-    testImplementation(libs.bundles.junit)
-    testImplementation(project(":plugins:civmodcore-paper"))
-    testImplementation(project(":plugins:combattagplus-paper"))
+    compileOnly(files("../../ansible/src/paper-plugins/BreweryX-3.6.3.jar"))
     testImplementation("org.mockito:mockito-core:5.11.0")
+    testImplementation(project(":plugins:combattagplus-paper"))
+    testImplementation(project(":plugins:civmodcore-paper"))
+    testImplementation(libs.bundles.junit)
 }
 
 tasks.test {

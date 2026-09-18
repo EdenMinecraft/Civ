@@ -7,7 +7,6 @@ import com.devotedmc.ExilePearl.util.Clock;
 import java.util.List;
 import java.util.UUID;
 import net.minelink.ctplus.compat.base.NpcIdentity;
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -74,6 +73,11 @@ public interface ExilePearlApi extends Plugin, PearlAccess, PearlLogger, PlayerP
      * @return true if the player is tagged
      */
     boolean isPlayerTagged(UUID uid);
+
+    /**
+     * Gets whether a player would spawn a combat tagger on logout
+     */
+    boolean wouldSpawnNpc(Player player);
 
     /**
      * Gets a player as a tagged NPC entity.

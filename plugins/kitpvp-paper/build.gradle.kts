@@ -12,9 +12,9 @@ dependencies {
 
     compileOnly(project(":plugins:civmodcore-paper"))
     compileOnly(project(":plugins:finale-paper"))
-    compileOnly("net.luckperms:api:5.4")
+    compileOnly(libs.luckperms.api)
 
-    compileOnly(files("../../ansible/src/paper-plugins/BreweryX-3.6.0.jar"))
+    compileOnly(files("../../ansible/src/paper-plugins/BreweryX-3.6.3.jar"))
     compileOnly(libs.aswm.api)
-    compileOnly("me.clip:placeholderapi:2.11.6")
+    compileOnly(libs.placeholderapi)
 }

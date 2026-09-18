@@ -109,6 +109,10 @@ hacks:
       - SLOW_DIGGING
       - SLOW_FALLING
       - UNLUCK
+      - OOZING
+      - WEAVING
+      - INFESTED
+      - WIND_CHARGED
   DebugWand:
     enabled: true
   DogFacts:
@@ -250,6 +254,8 @@ hacks:
     # Determines the maximum light level at the spawning entity's location that phantoms are allowed to spawn at.
     # Note: 15 will enable spawning at all light levels.
     maximumLightSpawn: 7
+    # Biomes where natural phantom spawns bypass this hack's spawn restrictions. Use Bukkit biome names.
+    biomeWhitelist: []
   PlayerRevive:
     enabled: true
   PlayerStatistics:
@@ -340,6 +346,14 @@ hacks:
     minDepthToMatch: 2
     watchedMaterials:
       - CHEST
+      - TRAPPED_CHEST
+      - COPPER_CHEST
+      - EXPOSED_COPPER_CHEST
+      - OXIDIZED_COPPER_CHEST
+      - WEATHERED_COPPER_CHEST
+      - WAXED_COPPER_CHEST
+      - WAXED_EXPOSED_COPPER_CHEST
+      - WAXED_OXIDIZED_COPPER_CHEST
       - FURNACE
       - JUKEBOX
       - NOTE_BLOCK
@@ -497,6 +511,7 @@ hacks:
        - ==: org.bukkit.inventory.ItemStack
          type: COOKIE
          amount: 32
+         v: 3839
          meta:
            ==: ItemMeta
            meta-type: UNSPECIFIC
@@ -504,8 +519,9 @@ hacks:
             - "Gift from the Admins as you"
             - "begin your journey on CivMC"
        - ==: org.bukkit.inventory.ItemStack
-         type: BED
+         type: RED_BED
          amount: 1
+         v: 3839
          meta:
            ==: ItemMeta
            meta-type: UNSPECIFIC
@@ -514,8 +530,9 @@ hacks:
             - "Be sure to get a good night's"
             - "rest soon."
        - ==: org.bukkit.inventory.ItemStack
-         type: BOAT
+         type: OAK_BOAT
          amount: 1
+         v: 3839
          meta:
            ==: ItemMeta
            meta-type: UNSPECIFIC
@@ -524,6 +541,7 @@ hacks:
        - ==: org.bukkit.inventory.ItemStack
          type: MINECART
          amount: 1
+         v: 3839
          meta:
            ==: ItemMeta
            meta-type: UNSPECIFIC
@@ -548,6 +566,7 @@ hacks:
     blocks:
       JUNGLE_LEAVES: 0.025
       DARK_OAK_LEAVES: 0.05
+      PALE_OAK_LEAVES: 0.05
       OAK_LEAVES: 0
       BIRCH_LEAVES: 0
       ACACIA_LEAVES: 0
@@ -570,16 +589,26 @@ hacks:
     materials:
       COBBLESTONE: 8
       COPPER_BLOCK: 29
+      WAXED_COPPER_BLOCK: 29
       EXPOSED_COPPER: 23
+      WAXED_EXPOSED_COPPER: 23
       WEATHERED_COPPER: 18
+      WAXED_WEATHERED_COPPER: 18
       OXIDIZED_COPPER: 14
+      WAXED_OXIDIZED_COPPER: 14
     skyBase: 10
     skyMaterials:
       COBBLESTONE: 8
       COPPER_BLOCK: 30
+      WAXED_COPPER_BLOCK: 30
       EXPOSED_COPPER: 24
+      WAXED_EXPOSED_COPPER: 24
       WEATHERED_COPPER: 19
+      WAXED_WEATHERED_COPPER: 19
       OXIDIZED_COPPER: 15
+      WAXED_OXIDIZED_COPPER: 15
+  CactusCleanup:
+    enabled: true
   CopperRail:
     enabled: true
     deoxidise: true
@@ -595,8 +624,13 @@ hacks:
   CreeperDiscHack:
     enabled: true
     discChance: 0.003
-  NoOozing:
+  WitherSkeletonCoalHack:
     enabled: true
+    coalDropChance: 0.2
+  WaterMushroomDropHack:
+    enabled: true
+    dropChance: 0.124
+    dropMultiplier: 8
   BuildLimits:
     enabled: true
     limits:
@@ -620,10 +654,26 @@ hacks:
   Trowel:
     enabled: true
   MobCulling:
-    enabled: false
-    turtleAllowance: 100
-    turtleMaxAge: 360000
-    striderAllowance: 100
-    striderMaxAge: 360000
+    enabled: true
+    mobs:
+      - TURTLE
+      - STRIDER
+      - CHICKEN
+      - COW
+      - SHEEP
+      - PIG
+      - NAUTILUS
+      - FOX
+      - ARMADILLO
+    allowance: 200
+    maxAge: 360000
   NetheriteCrafting:
     enabled: true
+  NameLocker:
+    enabled: true
+  BrewIndex:
+    enabled: true
+  ServerLinksHack:
+    enabled: true
+    discordUrl: https://discord.gg/civmc
+    patreonUrl: https://patreon.com/Civ_MC

@@ -1,4 +1,6 @@
 import com.gradle.enterprise.gradleplugin.GradleEnterpriseExtension
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     alias(libs.plugins.paper.userdev) apply false
@@ -21,6 +23,7 @@ allprojects {
 
     repositories {
         mavenCentral()
+        maven(url = "https://mvn.lumine.io/repository/maven-public/")
         maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://oss.sonatype.org/content/repositories/snapshots")
@@ -34,5 +37,29 @@ allprojects {
         maven("https://repo.ajg0702.us/releases")
         maven("https://repo.codemc.io/repository/EvenMoreFish/")
         maven("https://nexus.scarsz.me/content/groups/public/")
+    }
+}
+
+subprojects {
+    project.pluginManager.withPlugin("java") {
+        @Suppress("UnstableApiUsage")
+        project.extensions.configure<TestingExtension> {
+            suites {
+                withType<JvmTestSuite>().configureEach {
+                    useJUnitJupiter()
+                    targets.configureEach {
+                        testTask.configure {
+                            testLogging {
+                                events(*TestLogEvent.entries.toTypedArray())
+                                exceptionFormat = TestExceptionFormat.FULL
+                                showCauses = true
+                                showExceptions = true
+                                showStackTraces = true
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

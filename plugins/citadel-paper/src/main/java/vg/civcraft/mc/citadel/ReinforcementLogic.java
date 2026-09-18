@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.type.AmethystCluster;
@@ -66,6 +67,7 @@ public final class ReinforcementLogic {
         futureHealth = Math.min(futureHealth, rein.getType().getHealth());
         rein.setHealth(futureHealth);
         if (rein.isBroken()) {
+            Citadel.getInstance().getReinforcementManager().removeReinforcement(rein);
             if (rein.getType().getDestructionEffect() != null) {
                 rein.getType().getDestructionEffect().playEffect(rein);
             }
@@ -104,22 +106,20 @@ public final class ReinforcementLogic {
             inactiveDecay = reinforcement.getType().getDeletedGroupMultiplier();
         }
 
-        return inactiveDecay * getBufferDecayDamage(reinforcement);
+        return inactiveDecay * getEnvironmentalDecayDamage(reinforcement);
     }
 
-    private static double getBufferDecayDamage(Reinforcement reinforcement) {
+    private static double getEnvironmentalDecayDamage(Reinforcement reinforcement) {
         Location location = reinforcement.getLocation();
-        WorldBorderBuffers buffer = Citadel.getInstance().getConfigManager().getWorldBorderBuffers()
-            .get(location.getWorld().getUID());
-        if (!buffer.decay()) {
-            return 1;
+        CitadelConfigManager config = Citadel.getInstance().getConfigManager();
+        WorldBorderBuffers buffer = config.getWorldBorderBuffers().get(location.getWorld().getUID());
+        boolean borderDecay = buffer != null && buffer.decay()
+            && buffer.checkIfOutside(location.getX(), location.getZ());
+        if (borderDecay || config.isBiomeDecayLocation(location)) {
+            return reinforcement.getType().getDecayDamageMultipler(reinforcement.getCreationTime());
         }
 
-        if (!buffer.checkIfOutside(location.getX(), location.getZ())) {
-            return 1;
-        }
-
-        return reinforcement.getType().getDecayDamageMultipler(reinforcement.getCreationTime());
+        return 1;
     }
 
 
@@ -135,39 +135,35 @@ public final class ReinforcementLogic {
         if (reinforcement != null) {
             return reinforcement;
         }
-        switch (block.getType()) {
-            // Chests are awkward since you can place both sides of a double chest
-            // independently, which isn't true for
-            // beds, plants, or doors, so this needs to be accounted for and
-            // "getResponsibleBlock()" isn't appropriate
-            // for the following logic: that both sides protect each other; that if either
-            // block is reinforced, then
-            // the chest as a whole remains protected.
-            case CHEST:
-            case TRAPPED_CHEST: {
-                Chest chest = (Chest) block.getBlockData();
-                BlockFace facing = chest.getFacing();
-                switch (chest.getType()) {
-                    case LEFT: {
-                        BlockFace face = WorldUtils.turnClockwise(facing);
-                        return getReinforcementAt(block.getLocation().add(face.getDirection()));
-                    }
-                    case RIGHT: {
-                        BlockFace face = WorldUtils.turnAntiClockwise(facing);
-                        return getReinforcementAt(block.getLocation().add(face.getDirection()));
-                    }
-                    default: {
-                        return null;
-                    }
+        // Chests are awkward since you can place both sides of a double chest
+        // independently, which isn't true for
+        // beds, plants, or doors, so this needs to be accounted for and
+        // "getResponsibleBlock()" isn't appropriate
+        // for the following logic: that both sides protect each other; that if either
+        // block is reinforced, then
+        // the chest as a whole remains protected.
+        if (block.getType() == Material.CHEST || block.getType() == Material.TRAPPED_CHEST || Tag.COPPER_CHESTS.isTagged(block.getType())) {
+            Chest chest = (Chest) block.getBlockData();
+            BlockFace facing = chest.getFacing();
+            switch (chest.getType()) {
+                case LEFT: {
+                    BlockFace face = WorldUtils.turnClockwise(facing);
+                    return getReinforcementAt(block.getLocation().add(face.getDirection()));
                 }
-            }
-            default: {
-                Block responsible = getResponsibleBlock(block);
-                if (Objects.equals(block, responsible)) {
+                case RIGHT: {
+                    BlockFace face = WorldUtils.turnAntiClockwise(facing);
+                    return getReinforcementAt(block.getLocation().add(face.getDirection()));
+                }
+                default: {
                     return null;
                 }
-                return getReinforcementAt(responsible.getLocation());
             }
+        } else {
+            Block responsible = getResponsibleBlock(block);
+            if (Objects.equals(block, responsible)) {
+                return null;
+            }
+            return getReinforcementAt(responsible.getLocation());
         }
     }
 

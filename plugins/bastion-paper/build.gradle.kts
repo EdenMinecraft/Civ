@@ -18,4 +18,5 @@ dependencies {
     testImplementation(project(":plugins:civmodcore-paper"))
     testImplementation(project(":plugins:namelayer-paper"))
     testImplementation(project(":plugins:citadel-paper"))
+    compileOnly(libs.mythic.dist)
 }

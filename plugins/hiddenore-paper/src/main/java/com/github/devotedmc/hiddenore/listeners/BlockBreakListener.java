@@ -1,10 +1,23 @@
 package com.github.devotedmc.hiddenore.listeners;
 
+import com.github.devotedmc.hiddenore.BlockConfig;
+import com.github.devotedmc.hiddenore.Config;
+import com.github.devotedmc.hiddenore.DropConfig;
+import com.github.devotedmc.hiddenore.HiddenOre;
+import com.github.devotedmc.hiddenore.ToolConfig;
+import com.github.devotedmc.hiddenore.VeinConfig;
+import com.github.devotedmc.hiddenore.events.HiddenOreEvent;
+import com.github.devotedmc.hiddenore.events.HiddenOreGenerateEvent;
 import com.github.devotedmc.hiddenore.util.FakePlayer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.UUID;
+import java.util.logging.Level;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.ChatColor;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
@@ -21,21 +34,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
-import java.util.logging.Level;
-
-import com.github.devotedmc.hiddenore.BlockConfig;
-import com.github.devotedmc.hiddenore.DropConfig;
-import com.github.devotedmc.hiddenore.HiddenOre;
-import com.github.devotedmc.hiddenore.Config;
-import com.github.devotedmc.hiddenore.ToolConfig;
-import com.github.devotedmc.hiddenore.VeinConfig;
-import com.github.devotedmc.hiddenore.events.HiddenOreEvent;
-import com.github.devotedmc.hiddenore.events.HiddenOreGenerateEvent;
-
 /**
  * Heart of ore generation, handles breaks.
  *
@@ -47,6 +45,7 @@ public class BlockBreakListener implements Listener {
 
     public BlockBreakListener(HiddenOre plugin) {
         this.plugin = plugin;
+        FakePlayer.warmup();
     }
 
     /**
@@ -65,7 +64,7 @@ public class BlockBreakListener implements Listener {
 
     public static void spoofBlockBreak(Location playerLoc, Block block, ItemStack inHand) {
         HiddenOre.getPlugin().getBreakListener().doBlockBreak(
-            new BlockBreakEvent(block, new FakePlayer(playerLoc, inHand))
+            new BlockBreakEvent(block, FakePlayer.create(playerLoc, inHand))
         );
     }
 
@@ -91,13 +90,7 @@ public class BlockBreakListener implements Listener {
         // someone listening might object to our manipulation here.
         if (bc != null && bc.suppressDrops) {
             debug("Attempting to suppress break of tracked type {0}", blockName);
-            HiddenOreGenerateEvent hoges = new HiddenOreGenerateEvent(p, b, Material.AIR);
-            Bukkit.getPluginManager().callEvent(hoges);
-            if (!hoges.isCancelled()) {
-                b.setType(Material.AIR);
-                event.setCancelled(true);
-            }
-            bc = null;
+            event.setDropItems(false);
         }
 
         // Check with out tracker to see if any more drops are available in this little slice of the world.

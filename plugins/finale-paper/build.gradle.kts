@@ -14,6 +14,6 @@ dependencies {
     compileOnly(project(":plugins:namelayer-paper"))
     compileOnly(project(":plugins:citadel-paper"))
     compileOnly(project(":plugins:combattagplus-paper"))
-
-    compileOnly(libs.protocollib)
+    compileOnly(libs.mythic.dist)
+    compileOnly(libs.packetevents.spigot)
 }

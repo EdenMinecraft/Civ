@@ -12,6 +12,8 @@ dependencies {
 
     compileOnly(project(":plugins:civmodcore-paper"))
     api(project(":libraries:name-api"))
+    api(project(":libraries:namelayer-sync"))
+    api(libs.rabbitmq.client)
 
     testImplementation(libs.bundles.junit)
     testImplementation(libs.mockbukkit)

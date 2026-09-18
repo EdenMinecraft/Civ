@@ -21,6 +21,7 @@ import com.untamedears.jukealert.model.actions.impl.LoginAction;
 import com.untamedears.jukealert.model.actions.impl.LogoutAction;
 import com.untamedears.jukealert.model.actions.impl.MountEntityAction;
 import com.untamedears.jukealert.model.actions.impl.OpenContainerAction;
+import com.untamedears.jukealert.model.actions.impl.PlaceVehicleAction;
 import com.untamedears.jukealert.util.JukeAlertPermissionHandler;
 import java.util.Collection;
 import java.util.HashSet;
@@ -60,6 +61,7 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.entity.EntityMountEvent;
+import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
@@ -180,6 +182,20 @@ public class LoggableActionListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlaceVehicle(EntityPlaceEvent event) {
+        Player player = event.getPlayer();
+        if (player == null) {
+            return;
+        }
+        Entity entity = event.getEntity();
+        if (!(entity instanceof Vehicle vehicle) || vehicle.getSpawnCategory() != SpawnCategory.MISC) {
+            return;
+        }
+        handlePlayerAction(player, s -> new PlaceVehicleAction(System.currentTimeMillis(), s,
+            player.getUniqueId(), entity.getLocation(), getVehiclePlaceName(entity)));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEnterVehicle(VehicleEnterEvent event) {
         if (event.getEntered().getType() != EntityType.PLAYER || event.getVehicle().getSpawnCategory() != SpawnCategory.MISC) {
             return;
@@ -267,7 +283,7 @@ public class LoggableActionListener implements Listener {
             location, material));
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR)
     public void playerJoinEvent(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         Set<Snitch> covering = new HashSet<>(snitchManager.getSnitchesCovering(event.getPlayer().getLocation()));
@@ -275,7 +291,7 @@ public class LoggableActionListener implements Listener {
         insideFields.put(event.getPlayer().getUniqueId(), covering);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOW)
     public void playerQuitEvent(PlayerQuitEvent event) {
         handleSnitchLogout(event.getPlayer());
     }
@@ -358,6 +374,14 @@ public class LoggableActionListener implements Listener {
             return boat.getBoatMaterial().name();
         } else {
             return vehicle.getType().toString();
+        }
+    }
+
+    private String getVehiclePlaceName(Entity entity) {
+        if (entity instanceof Boat boat) {
+            return boat.getBoatMaterial().name();
+        } else {
+            return entity.getType().toString();
         }
     }
 
