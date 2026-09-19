@@ -3,6 +3,7 @@ package com.devotedmc.ExilePearl.core;
 import com.devotedmc.ExilePearl.*;
 import com.devotedmc.ExilePearl.command.*;
 import com.devotedmc.ExilePearl.config.PearlConfig;
+import com.devotedmc.ExilePearl.event.PearlDecayEvent;
 import com.devotedmc.ExilePearl.holder.PearlHolder;
 import com.devotedmc.ExilePearl.listener.BanStickListener;
 import com.devotedmc.ExilePearl.listener.BastionListener;
@@ -257,6 +258,13 @@ final class ExilePearlCore implements ExilePearlApi {
     @Override
     public PearlConfig getPearlConfig() {
         return pearlConfig;
+    }
+
+    @Override
+    public int getEffectivePearlDecayAmount(ExilePearl pearl) {
+        PearlDecayEvent preview = new PearlDecayEvent(pearl, pearlConfig.getPearlHealthDecayAmount(), true);
+        getServer().getPluginManager().callEvent(preview);
+        return preview.isCancelled() ? 0 : preview.getDamageAmount();
     }
 
     /**
