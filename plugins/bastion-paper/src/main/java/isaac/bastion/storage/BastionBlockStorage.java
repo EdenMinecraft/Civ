@@ -2,6 +2,7 @@ package isaac.bastion.storage;
 
 import com.github.davidmoten.rtree2.Entry;
 import com.github.davidmoten.rtree2.RTree;
+import com.github.davidmoten.rtree2.geometry.Geometries;
 import com.github.davidmoten.rtree2.geometry.Rectangle;
 import com.github.davidmoten.rtree2.geometry.internal.PointDouble;
 import isaac.bastion.Bastion;
@@ -18,8 +19,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
@@ -46,8 +49,14 @@ public class BastionBlockStorage {
 
     private HashMap<Location, BastionType> pendingBastions;
 
+    // Bastions the reconciler retyped, queued on the main thread and drained off-thread by the
+    // flush task, so the lazy chunk-load heal never blocks a tick on JDBC.
+    private final Queue<BastionBlock> pendingTypeChanges = new ConcurrentLinkedQueue<>();
+    private int typeFlushTaskId;
+
     private static final String addBastion = "insert into bastion_blocks (bastion_type, loc_x, loc_y, loc_z, loc_world, placed) values (?,?,?,?,?,?);";
     private static final String updateBastion = "update bastion_blocks set placed=? where bastion_id=?;";
+    private static final String updateBastionType = "update bastion_blocks set bastion_type=? where bastion_id=?;";
     private static final String deleteBastion = "delete from bastion_blocks where bastion_id=?;";
     private static final String setDead = "update bastion_blocks set dead=1 where bastion_id=?;";
     private static final String deleteDead = "delete from bastion_blocks where loc_world=? and loc_x=? and loc_y=? and loc_z=?;";
@@ -69,6 +78,13 @@ public class BastionBlockStorage {
                 update();
             }
         }.runTaskTimer(Bastion.getPlugin(), saveDelay, saveDelay).getTaskId();
+        // Persist queued reconciler retypes off the main thread, batched, a few times a minute.
+        typeFlushTaskId = new BukkitRunnable() {
+            @Override
+            public void run() {
+                flushTypeChanges();
+            }
+        }.runTaskTimerAsynchronously(Bastion.getPlugin(), 200L, 200L).getTaskId();
     }
 
     /**
@@ -76,7 +92,32 @@ public class BastionBlockStorage {
      */
     public void close() {
         Bukkit.getScheduler().cancelTask(taskId);
+        Bukkit.getScheduler().cancelTask(typeFlushTaskId);
         update();
+        flushTypeChanges();
+    }
+
+    /**
+     * Drains queued reconciler retypes into one batched UPDATE. Runs off the main thread. A failed
+     * flush just drops the batch: the in-memory type is already correct, and the next time the
+     * bastion's chunk loads the reconciler re-detects the drift and re-queues the write.
+     */
+    private void flushTypeChanges() {
+        if (pendingTypeChanges.isEmpty()) {
+            return;
+        }
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(updateBastionType)) {
+            BastionBlock bastion;
+            while ((bastion = pendingTypeChanges.poll()) != null) {
+                ps.setString(1, bastion.getType().getName());
+                ps.setInt(2, bastion.getId());
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        } catch (SQLException e) {
+            log.log(Level.WARNING, "Failed to flush bastion type corrections", e);
+        }
     }
 
     /**
@@ -120,6 +161,28 @@ public class BastionBlockStorage {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Retypes a bastion in place to match its world block, queuing the DB write for the async
+     * flusher. The object keeps its slot in the {@code bastions} TreeSet (ordering is location-only),
+     * so this never structurally mutates that set -- which matters because the erosion/regen tasks
+     * iterate it on async threads without locking. Only the per-world R-tree is updated (its
+     * rectangle depends on the type's radius); {@code blocks} is touched solely on the main thread.
+     * Must be called on the main thread.
+     */
+    public void retypeBastion(BastionBlock bastion, BastionType newType) {
+        World world = bastion.getLocation().getWorld();
+        RTree<BastionBlock, Rectangle> tree = blocks.get(world);
+        if (tree != null) {
+            // Delete keyed by the OLD rectangle (old radius) before the type changes under it.
+            tree = tree.delete(bastion, bastion.asRectangle());
+            bastion.setType(newType);
+            blocks.put(world, tree.add(bastion, bastion.asRectangle()));
+        } else {
+            bastion.setType(newType);
+        }
+        pendingTypeChanges.add(bastion);
     }
 
     /**
@@ -232,6 +295,35 @@ public class BastionBlockStorage {
             }
         }
         return result;
+    }
+
+    /**
+     * All bastions whose block sits in the given chunk. The R-tree is keyed by each bastion's field
+     * extent, so a chunk-rectangle search returns every bastion whose field overlaps the chunk; the
+     * result is filtered down to those whose block actually lands in it.
+     */
+    public List<BastionBlock> getBastionsInChunk(World world, int chunkX, int chunkZ) {
+        RTree<BastionBlock, Rectangle> tree = blocks.get(world);
+        if (tree == null) {
+            return List.of();
+        }
+        int minX = chunkX << 4;
+        int minZ = chunkZ << 4;
+        Iterable<Entry<BastionBlock, Rectangle>> search =
+            tree.search(Geometries.rectangle(minX, minZ, minX + 15, minZ + 15));
+        // Lazily allocated: the overwhelmingly common chunk has no bastion and allocates nothing.
+        List<BastionBlock> result = null;
+        for (Entry<BastionBlock, Rectangle> entry : search) {
+            BastionBlock bastion = entry.value();
+            if ((bastion.getLocation().getBlockX() >> 4) == chunkX
+                && (bastion.getLocation().getBlockZ() >> 4) == chunkZ) {
+                if (result == null) {
+                    result = new ArrayList<>();
+                }
+                result.add(bastion);
+            }
+        }
+        return result == null ? List.of() : result;
     }
 
     /**
