@@ -4,6 +4,8 @@ junit = "6.0.3"
 nuotifier = "2.7.2"
 velocity = "3.4.0-SNAPSHOT"
 configurate = "4.2.0"
+testcontainers = "1.20.6"
+mariadb-driver = "3.5.6"
 
 [plugins]
 paper-userdev = { id = "io.papermc.paperweight.userdev", version = "2.0.0-beta.17" }
@@ -48,6 +50,11 @@ junit-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", ver
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
 mockbukkit = { group = "org.mockbukkit.mockbukkit", name = "mockbukkit-v1.21", version = "4.93.0" }
 
+testcontainers-core = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
+testcontainers-junit = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
+testcontainers-mariadb = { group = "org.testcontainers", name = "mariadb", version.ref = "testcontainers" }
+mariadb-driver = { group = "org.mariadb.jdbc", name = "mariadb-java-client", version.ref = "mariadb-driver" }
+
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version = "2.0.17" }
 
 evenmorefish-paper = { group = "com.oheers.evenmorefish", name = "even-more-fish-plugin", version = "2.0.6"}
@@ -57,6 +64,7 @@ jda = { group = "net.dv8tion", name = "JDA", version = "6.2.1"}
 
 [bundles]
 junit = ["junit-api", "junit-engine", "junit-platform-launcher"]
+testcontainers = ["testcontainers-core", "testcontainers-junit", "testcontainers-mariadb"]
 nuvotifier = ["nuvotifier-api", "nuvotifier-bukkit"]
 evenmorefish = ["evenmorefish-api", "evenmorefish-paper"]
 discordsrv = ["discordsrv-paper", "jda"]
