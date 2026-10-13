@@ -24,6 +24,17 @@ ruleItem: "STONE_BUTTON"
 # Allows players to create a shop by looking at a valid shop block with an acceptable format of items
 createShopFromChest: true
 
+# Limits on how large a single exchange may be. An exchange is an unbroken run of input rules
+# followed by an unbroken run of output rules, so bulk rule blocks can make very large exchanges
+# cheap to build. Any exchange that exceeds these limits is treated as broken and will not work
+# at all; it is never quietly trimmed, since dropping an input would let a buyer underpay.
+# Set a value to 0 for no limit.
+tradeLimits:
+  # Maximum number of input rules a single exchange may require.
+  maxInputs: 8
+  # Maximum number of output rules a single exchange may pay out.
+  maxOutputs: 8
+
 repairables:
   - "NETHERITE_HELMET"
   - "NETHERITE_CHESTPLATE"
