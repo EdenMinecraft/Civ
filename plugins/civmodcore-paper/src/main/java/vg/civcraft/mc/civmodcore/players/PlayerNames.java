@@ -2,9 +2,9 @@ package vg.civcraft.mc.civmodcore.players;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
@@ -16,20 +16,23 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
 
 public final class PlayerNames implements Listener {
 
-    private static final Set<String> names = new HashSet<>();
+    // Concurrent: the async-seed task writes on the global region thread while the login handler and external
+    // getPlayerNames() callers touch it from connection/region threads under Folia.
+    private static final Set<String> names = ConcurrentHashMap.newKeySet();
 
     public PlayerNames(Plugin plugin) {
         names.clear();
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        CivScheduler.runAsync(plugin, () -> {
             OfflinePlayer[] players = Bukkit.getOfflinePlayers();
             List<String> namesList = Stream.of(players)
                 .map(OfflinePlayer::getName)
                 .filter(StringUtils::isNotBlank)
                 .toList();
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            CivScheduler.runGlobal(plugin, () -> {
                 names.addAll(namesList);
             });
         });
