@@ -11,8 +11,13 @@ import com.github.igotyou.FactoryMod.factories.FurnCraftChestFactory;
 import com.github.igotyou.FactoryMod.factories.Pipe;
 import com.github.igotyou.FactoryMod.factories.Sorter;
 import com.github.igotyou.FactoryMod.recipes.IRecipe;
+import com.github.igotyou.FactoryMod.recipes.RepairRecipe;
 import com.github.igotyou.FactoryMod.repairManager.PercentageHealthRepairManager;
 import java.io.File;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +43,8 @@ public class FileHandler {
     private FactoryModManager manager;
     private File saveFile;
     private File backup;
+    private long nextSnapshotSequence;
+    private long lastSavedSequence;
 
     private Map<String, String> factoryRenames;
 
@@ -53,89 +60,118 @@ public class FileHandler {
             + File.separator + "factoryDataPreviousSave.yml");
     }
 
-    public void save(Collection<Factory> factories) {
-        if (saveFile.exists()) {
-            // old save file exists, so it is our new backup now
-            if (backup.exists()) {
-                backup.delete();
-            }
-            saveFile.renameTo(backup);
-        }
-        try {
-            saveFile.createNewFile();
-            YamlConfiguration config = YamlConfiguration
-                .loadConfiguration(saveFile);
-            config.set("version", saveFileVersion);
-            for (Factory f : factories) {
-                String current = serializeLocation(f.getMultiBlockStructure()
-                    .getCenter());
-                config.set(current + ".name", f.getName());
-                ConfigurationSection blockSection = config.getConfigurationSection(current).createSection("blocks");
-                configureLocation(blockSection, f.getMultiBlockStructure().getAllBlocks());
-                if (f instanceof FurnCraftChestFactory) {
-                    FurnCraftChestFactory fccf = (FurnCraftChestFactory) f;
-                    config.set(current + ".type", "FCC");
-                    config.set(current + ".health",
-                        ((PercentageHealthRepairManager) fccf
-                            .getRepairManager()).getRawHealth());
-                    config.set(current + ".breakTime",
-                        ((PercentageHealthRepairManager) fccf
-                            .getRepairManager()).getBreakTime());
-                    config.set(current + ".runtime", fccf.getRunningTime());
-                    config.set(current + ".selectedRecipe", fccf
-                        .getCurrentRecipe().getName());
-                    config.set(current + ".autoSelect", fccf.isAutoSelect());
-                    List<String> recipeList = new LinkedList<String>();
-                    for (IRecipe rec : fccf.getRecipes()) {
-                        recipeList.add(rec.getIdentifier());
-                    }
-                    config.set(current + ".recipes", recipeList);
-                    if (fccf.getActivator() == null) {
-                        config.set(current + ".activator", "null");
-                    } else {
-                        config.set(current + ".activator", fccf.getActivator().toString());
-                    }
-                    for (IRecipe i : ((FurnCraftChestFactory) f).getRecipes()) {
-                        config.set(current + ".runcounts." + i.getName(), fccf.getRunCount(i));
-                        config.set(current + ".recipeLevels." + i.getName(), fccf.getRecipeLevel(i));
-                    }
-                    config.set(current + ".furnace-io", fccf.getFurnaceIOSelector().toConfigSection());
-                    config.set(current + ".table-io", fccf.getTableIOSelector().toConfigSection());
-                    config.set(current + ".ui-menu-mode", fccf.getUiMenuMode().name());
-                    config.set(current + ".charcoal-level", fccf.getCharcoalLevel());
-                    config.set(current + ".speed-level", fccf.getSpeedLevel());
-                    config.set(current + ".charcoal-absorbed", fccf.getCharcoalAbsorbed());
-                } else if (f instanceof Pipe) {
-                    Pipe p = (Pipe) f;
-                    config.set(current + ".type", "PIPE");
-                    config.set(current + ".runtime", p.getRunTime());
-                    List<String> mats = new LinkedList<>();
-                    List<Material> materials = p.getAllowedMaterials();
-                    if (materials != null) {
-                        for (Material m : materials) {
-                            mats.add(m.toString());
-                        }
-                    }
-                    config.set(current + ".materials", mats);
-                } else if (f instanceof Sorter) {
-                    Sorter s = (Sorter) f;
-                    config.set(current + ".runtime", s.getRunTime());
-                    config.set(current + ".type", "SORTER");
-                    for (BlockFace face : WorldUtils.ALL_SIDES) {
-                        config.set(current + ".faces." + face.toString(), s
-                            .getItemsForSide(face)
-                            .getItemStackRepresentation().toArray());
+    // Capture on the server thread so recipe transitions cannot split a save across states.
+    public SaveSnapshot snapshot(Collection<Factory> factories) {
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("version", saveFileVersion);
+        for (Factory f : factories) {
+            String current = serializeLocation(f.getMultiBlockStructure()
+                .getCenter());
+            config.set(current + ".name", f.getName());
+            ConfigurationSection blockSection = config.getConfigurationSection(current).createSection("blocks");
+            configureLocation(blockSection, f.getMultiBlockStructure().getAllBlocks());
+            if (f instanceof FurnCraftChestFactory) {
+                FurnCraftChestFactory fccf = (FurnCraftChestFactory) f;
+                config.set(current + ".type", "FCC");
+                config.set(current + ".health",
+                    ((PercentageHealthRepairManager) fccf
+                        .getRepairManager()).getRawHealth());
+                config.set(current + ".breakTime",
+                    ((PercentageHealthRepairManager) fccf
+                        .getRepairManager()).getBreakTime());
+                config.set(current + ".runtime", fccf.getRunningTime());
+                config.set(current + ".active", fccf.isActive());
+                config.set(current + ".selectedRecipe", fccf.getCurrentRecipe() == null
+                    ? null : fccf.getCurrentRecipe().getName());
+                config.set(current + ".preferredRecipeId", fccf.getPreferredRecipe() == null
+                    ? "" : fccf.getPreferredRecipe().getIdentifier());
+                config.set(current + ".automaticRepairInProgress", fccf.isAutomaticRepairInProgress());
+                config.set(current + ".autoSelect", fccf.isAutoSelect());
+                List<String> recipeList = new LinkedList<String>();
+                for (IRecipe rec : fccf.getRecipes()) {
+                    recipeList.add(rec.getIdentifier());
+                }
+                config.set(current + ".recipes", recipeList);
+                if (fccf.getActivator() == null) {
+                    config.set(current + ".activator", "null");
+                } else {
+                    config.set(current + ".activator", fccf.getActivator().toString());
+                }
+                for (IRecipe i : ((FurnCraftChestFactory) f).getRecipes()) {
+                    config.set(current + ".runcounts." + i.getName(), fccf.getRunCount(i));
+                    config.set(current + ".recipeLevels." + i.getName(), fccf.getRecipeLevel(i));
+                }
+                config.set(current + ".furnace-io", fccf.getFurnaceIOSelector().toConfigSection());
+                config.set(current + ".table-io", fccf.getTableIOSelector().toConfigSection());
+                config.set(current + ".ui-menu-mode", fccf.getUiMenuMode().name());
+                config.set(current + ".charcoal-level", fccf.getCharcoalLevel());
+                config.set(current + ".speed-level", fccf.getSpeedLevel());
+                config.set(current + ".charcoal-absorbed", fccf.getCharcoalAbsorbed());
+            } else if (f instanceof Pipe) {
+                Pipe p = (Pipe) f;
+                config.set(current + ".type", "PIPE");
+                config.set(current + ".runtime", p.getRunTime());
+                List<String> mats = new LinkedList<>();
+                List<Material> materials = p.getAllowedMaterials();
+                if (materials != null) {
+                    for (Material m : materials) {
+                        mats.add(m.toString());
                     }
                 }
+                config.set(current + ".materials", mats);
+            } else if (f instanceof Sorter) {
+                Sorter s = (Sorter) f;
+                config.set(current + ".runtime", s.getRunTime());
+                config.set(current + ".type", "SORTER");
+                for (BlockFace face : WorldUtils.ALL_SIDES) {
+                    config.set(current + ".faces." + face.toString(), s
+                        .getItemsForSide(face)
+                        .getItemStackRepresentation().toArray());
+                }
             }
-            config.save(saveFile);
+        }
+        return new SaveSnapshot(++nextSnapshotSequence, config);
+    }
+
+    public synchronized void save(SaveSnapshot snapshot) {
+        if (snapshot.sequence <= lastSavedSequence) {
+            return;
+        }
+        Path temporary = null;
+        try {
+            temporary = Files.createTempFile(saveFile.toPath().getParent(), "factoryData-", ".yml");
+            Files.writeString(temporary, snapshot.config.saveToString());
+            if (saveFile.exists()) {
+                Files.copy(saveFile.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.move(temporary, saveFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporary, saveFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            lastSavedSequence = snapshot.sequence;
             plugin.info("Successfully saved factory data");
         } catch (Exception e) {
-            // In case anything goes wrong while saving we always keep the
-            // latest valid backup
             plugin.severe("Fatal error while trying to save factory data");
             e.printStackTrace();
-            saveFile.delete();
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (java.io.IOException e) {
+                    plugin.warning("Could not remove temporary factory save " + temporary);
+                }
+            }
+        }
+    }
+
+    public static final class SaveSnapshot {
+        private final long sequence;
+        private final YamlConfiguration config;
+
+        private SaveSnapshot(long sequence, YamlConfiguration config) {
+            this.sequence = sequence;
+            this.config = config;
         }
     }
 
@@ -172,7 +208,7 @@ public class FileHandler {
     private void loadFromFile(File f, Map<String, IFactoryEgg> eggs) {
         int counter = 0;
         YamlConfiguration config = YamlConfiguration
-            .loadConfiguration(saveFile);
+            .loadConfiguration(f);
         int loadedVersion = config.getInt("version", 1);
         for (String key : config.getKeys(false)) {
             ConfigurationSection current = config.getConfigurationSection(key);
@@ -265,7 +301,7 @@ public class FileHandler {
                     int speedLevel = current.getInt("speed-level", 0);
                     int charcoalAbsorbed = current.getInt("charcoal-absorbed", 0);
                     FurnCraftChestFactory fac = (FurnCraftChestFactory) egg.revive(blocks, health, selectedRecipe,
-                        runtime, breakTime, recipes, charcoalLevel, speedLevel, charcoalAbsorbed);
+                        breakTime, recipes, charcoalLevel, speedLevel, charcoalAbsorbed);
                     String activator = current.getString("activator", "null");
                     UUID acti;
                     if (activator.equals("null")) {
@@ -299,6 +335,20 @@ public class FileHandler {
                         }
                     }
                     fac.setAutoSelect(autoSelect);
+                    String preferredRecipeId = current.getString("preferredRecipeId");
+                    String preferredRecipeName = current.getString("preferredRecipe", selectedRecipe);
+                    for (IRecipe recipe : fac.getRecipes()) {
+                        boolean matches = preferredRecipeId == null
+                            ? recipe.getName().equals(preferredRecipeName)
+                            : recipe.getIdentifier().equals(preferredRecipeId);
+                        if (matches) {
+                            fac.setPreferredRecipe(recipe);
+                            break;
+                        }
+                    }
+                    boolean wasActive = current.getBoolean("active", runtime > 0);
+                    fac.restoreAutomaticRepair(current.getBoolean("automaticRepairInProgress",
+                        wasActive && fac.getCurrentRecipe() instanceof RepairRecipe));
                 {
                     ConfigurationSection iosec = current.getConfigurationSection("furnace-io");
                     if (iosec != null) {
@@ -328,6 +378,15 @@ public class FileHandler {
                 }
                 fac.setUiMenuMode(menuMode);
                 manager.addFactory(fac);
+                if (wasActive) {
+                    IRecipe savedRecipe = fac.getCurrentRecipe();
+                    boolean restoredRecipe = savedRecipe != null && savedRecipe.getName().equals(selectedRecipe);
+                    if (restoredRecipe) {
+                        fac.resume(runtime);
+                    } else {
+                        fac.attemptToActivate(null, false);
+                    }
+                }
                 counter++;
                 break;
                 case "PIPE":
