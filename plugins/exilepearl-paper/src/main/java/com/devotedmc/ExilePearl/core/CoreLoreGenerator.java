@@ -85,10 +85,11 @@ final class CoreLoreGenerator implements LoreProvider {
 
         lore.add(parse("<a>Health: <n>%s/%s", health, config.getPearlHealthMaxValue()));
         String unit = config.getPearlHealthDecayHumanInterval();
+        int effectiveDecayAmount = ExilePearlPlugin.getApi().getEffectivePearlDecayAmount(pearl);
         int decayPerHumanInterval = PearlDecayMath.decayPerHumanInterval(
             config.getPearlHealthDecayHumanIntervalMin(),
             config.getPearlHealthDecayIntervalMin(),
-            config.getPearlHealthDecayAmount());
+            effectiveDecayAmount);
         int intervalsRemaining = PearlDecayMath.intervalsRemaining(health, decayPerHumanInterval);
         if (intervalsRemaining > 0 && pearl.isActive()) {
             lore.add(parse("<a>Time remaining: <n>%d %s", intervalsRemaining, unit));
