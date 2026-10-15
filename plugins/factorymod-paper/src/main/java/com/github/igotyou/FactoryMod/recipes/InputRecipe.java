@@ -280,53 +280,7 @@ public abstract class InputRecipe implements IRecipe {
     }
 
     protected boolean canFitInOutput(ItemMap outputMap, Inventory outputInv) {
-        ItemStack[] currentContent = outputInv.getStorageContents();
-        ItemStack[] simulatedOutput = new ItemStack[currentContent.length];
-        for (int i = 0; i < currentContent.length; i++) {
-            ItemStack slot = currentContent[i];
-            simulatedOutput[i] = slot == null ? null : slot.clone();
-        }
-
-        for (Entry<ItemStack, Integer> outputEntry : outputMap.getAllItems().entrySet()) {
-            ItemStack outputTemplate = outputEntry.getKey();
-            int remainingAmount = outputEntry.getValue();
-            if (outputTemplate == null || outputTemplate.isEmpty() || remainingAmount <= 0) {
-                continue;
-            }
-
-            int maxStackSize = Math.max(1, outputTemplate.getMaxStackSize());
-            for (int i = 0; i < simulatedOutput.length && remainingAmount > 0; i++) {
-                ItemStack existingStack = simulatedOutput[i];
-                if (existingStack == null || existingStack.isEmpty() || !existingStack.isSimilar(outputTemplate)) {
-                    continue;
-                }
-                int existingMaxStackSize = Math.max(1, existingStack.getMaxStackSize());
-                int freeSpace = Math.max(0, existingMaxStackSize - existingStack.getAmount());
-                if (freeSpace <= 0) {
-                    continue;
-                }
-                int movedAmount = Math.min(remainingAmount, freeSpace);
-                existingStack.setAmount(existingStack.getAmount() + movedAmount);
-                remainingAmount -= movedAmount;
-            }
-
-            for (int i = 0; i < simulatedOutput.length && remainingAmount > 0; i++) {
-                ItemStack existingStack = simulatedOutput[i];
-                if (existingStack != null && !existingStack.isEmpty()) {
-                    continue;
-                }
-                int movedAmount = Math.min(remainingAmount, maxStackSize);
-                ItemStack toInsert = outputTemplate.clone();
-                toInsert.setAmount(movedAmount);
-                simulatedOutput[i] = toInsert;
-                remainingAmount -= movedAmount;
-            }
-
-            if (remainingAmount > 0) {
-                return false;
-            }
-        }
-        return true;
+        return outputMap.fitsIn(outputInv);
     }
 
     protected boolean addOutputToInventorySafely(ItemMap outputMap, Inventory outputInv, List<ItemStack> insertedOutput) {
