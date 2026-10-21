@@ -6,6 +6,7 @@ import isaac.bastion.commands.PlayersStates.Mode;
 import isaac.bastion.listeners.BastionBreakListener;
 import isaac.bastion.listeners.BastionDamageListener;
 import isaac.bastion.listeners.BastionInteractListener;
+import isaac.bastion.listeners.ChunkReconcileListener;
 import isaac.bastion.listeners.CitadelListener;
 import isaac.bastion.listeners.ElytraListener;
 import isaac.bastion.listeners.ModeListener;
@@ -73,6 +74,7 @@ public final class Bastion extends ACivMod {
         getServer().getPluginManager().registerEvents(new NameLayerListener(blockStorage), this);
         getServer().getPluginManager().registerEvents(new CitadelListener(), this);
         getServer().getPluginManager().registerEvents(new ModeListener(), this);
+        getServer().getPluginManager().registerEvents(new ChunkReconcileListener(blockStorage), this);
     }
 
     private void setupDatabase() {
