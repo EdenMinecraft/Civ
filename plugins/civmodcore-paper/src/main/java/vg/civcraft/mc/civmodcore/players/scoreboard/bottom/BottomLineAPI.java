@@ -9,8 +9,7 @@ import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-import vg.civcraft.mc.civmodcore.CivModCorePlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
 
 public final class BottomLineAPI {
 
@@ -18,14 +17,7 @@ public final class BottomLineAPI {
     private static final String SEPARATOR = ChatColor.BOLD + "  " + ChatColor.BLACK + "||  " + ChatColor.RESET;
 
     public static void init() {
-        BukkitRunnable run = new BukkitRunnable() {
-
-            @Override
-            public void run() {
-                refreshAll();
-            }
-        };
-        run.runTaskTimer(CivModCorePlugin.getInstance(), 15, 15);
+        CivScheduler.runGlobalTimer(BottomLineAPI::refreshAll, 15, 15);
     }
 
     public static BottomLine createBottomLine(String identifier, int priority) {

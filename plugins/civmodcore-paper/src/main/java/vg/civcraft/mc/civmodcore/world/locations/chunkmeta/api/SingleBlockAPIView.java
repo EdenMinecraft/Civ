@@ -1,9 +1,9 @@
 package vg.civcraft.mc.civmodcore.world.locations.chunkmeta.api;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
 import vg.civcraft.mc.civmodcore.world.locations.global.GlobalLocationTracker;
 import vg.civcraft.mc.civmodcore.world.locations.global.LocationTrackable;
 
@@ -23,7 +23,7 @@ public class SingleBlockAPIView<T extends LocationTrackable> extends APIView {
     SingleBlockAPIView(JavaPlugin plugin, short pluginID, GlobalLocationTracker<T> tracker) {
         super(plugin, pluginID);
         this.tracker = tracker;
-        Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, tracker::initFromDB);
+        CivScheduler.runGlobal(plugin, tracker::initFromDB);
         registerRegularSaveRunnable();
     }
 
