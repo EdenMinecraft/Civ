@@ -108,7 +108,7 @@ public class FurnCraftChestEgg implements IFactoryEgg {
     }
 
     public Factory revive(List<Location> blocks, int health,
-                          String selectedRecipe, int productionTimer, long breakTime, List<String> recipeStrings,
+                          String selectedRecipe, long breakTime, List<String> recipeStrings,
                           int charcoalLevel, int speedLevel, int charcoalAbsorbed) {
         FurnCraftChestStructure fccs = new FurnCraftChestStructure(blocks);
         FurnacePowerManager fpm = new FurnacePowerManager(fccs.getFurnace(),
@@ -144,12 +144,6 @@ public class FurnCraftChestEgg implements IFactoryEgg {
         }
         if (fccf.getCurrentRecipe() == null && !currRecipes.isEmpty()) {
             fccf.setRecipe(currRecipes.get(0));
-        }
-        if (productionTimer != 0) {
-            fccf.attemptToActivate(null, true);
-            if (fccf.isActive()) {
-                fccf.setProductionTimer(productionTimer);
-            }
         }
         return fccf;
     }

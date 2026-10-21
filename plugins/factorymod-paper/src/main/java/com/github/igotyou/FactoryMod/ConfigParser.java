@@ -496,7 +496,7 @@ public class ConfigParser {
 
     public void enableFactoryDecay(ConfigurationSection config) {
         long interval = parseTimeAsTicks(config.getString("decay_intervall"));
-        plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, new FactoryGarbageCollector(), interval,
+        plugin.getServer().getScheduler().runTaskTimer(plugin, new FactoryGarbageCollector(), interval,
             interval);
     }
 
