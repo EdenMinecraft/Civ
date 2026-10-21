@@ -5,8 +5,10 @@ import java.util.LinkedList;
 import java.util.List;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.type.Switch;
 import vg.civcraft.mc.citadel.ReinforcementLogic;
 import vg.civcraft.mc.citadel.model.Reinforcement;
 import vg.civcraft.mc.civmodcore.world.WorldUtils;
@@ -109,6 +111,11 @@ public abstract class MultiBlockStructure {
      */
     public static boolean citadelRedstoneChecks(Block here) {
         if (!FactoryMod.getInstance().getManager().isCitadelEnabled()) {
+            return true;
+        }
+        // Buttons, levers and pressure plates are triggered by hand, not powered by anything around them. Their
+        // isBlockFacePowered reports their own output on every side, which would never match the air around them
+        if (here.getBlockData() instanceof Switch || Tag.PRESSURE_PLATES.isTagged(here.getType())) {
             return true;
         }
         Reinforcement rein = ReinforcementLogic.getReinforcementProtecting(here);

@@ -48,6 +48,21 @@ public class CompactingRecipe extends InputRecipe {
     }
 
     @Override
+    public EffectFeasibility evaluateEffectFeasibility(Inventory inputInv, Inventory outputInv) {
+        ItemMap im = new ItemMap(inputInv);
+        for (ItemStack is : inputInv.getContents()) {
+            if (is != null && compactable(is, im)) {
+                if (canFitInOutput(getCompactedOutput(is), outputInv)) {
+                    return new EffectFeasibility(true, null);
+                } else {
+                    return new EffectFeasibility(false, "it ran out of storage space");
+                }
+            }
+        }
+        return new EffectFeasibility(true, null);
+    }
+
+    @Override
     public int getProductionTime() {
         return productionTime;
     }
@@ -61,20 +76,38 @@ public class CompactingRecipe extends InputRecipe {
     public boolean applyEffect(Inventory inputInv, Inventory outputInv, FurnCraftChestFactory fccf) {
         MultiInventoryWrapper combo = new MultiInventoryWrapper(inputInv, outputInv);
         logBeforeRecipeRun(combo, fccf);
-        if (input.isContainedIn(inputInv)) {
-            ItemMap im = new ItemMap(inputInv);
-            //technically we could just directly work with the ItemMap here to iterate over the items so we dont check identical items multiple times,
-            //but using the iterator of the inventory preserves the order of the inventory, which is more important here to guarantee one behavior
-            //to the player
-            for (ItemStack is : inputInv.getContents()) {
-                if (is != null) {
-                    if (compactable(is, im)) {
-                        if (input.removeSafelyFrom(inputInv)) {
-                            compact(is, inputInv, outputInv);
-                        }
-                        break;
-                    }
+        if (!input.isContainedIn(inputInv)) {
+            logAfterRecipeRun(combo, fccf);
+            return true;
+        }
+        ItemMap im = new ItemMap(inputInv);
+        //technically we could just directly work with the ItemMap here to iterate over the items so we dont check identical items multiple times,
+        //but using the iterator of the inventory preserves the order of the inventory, which is more important here to guarantee one behavior
+        //to the player
+        for (ItemStack is : inputInv.getContents()) {
+            if (is != null && compactable(is, im)) {
+                ItemStack copy = is.clone();
+                copy.setAmount(getCompactStackSize(copy.getType()));
+                ItemMap toRemove = new ItemMap(copy);
+                ItemMap toAdd = getCompactedOutput(is);
+                if (!canFitInOutput(toAdd, outputInv)) {
+                    return false;
                 }
+                if (!input.removeSafelyFrom(inputInv)) {
+                    return false;
+                }
+                if (!toRemove.removeSafelyFrom(inputInv)) {
+                    restoreInput(input, inputInv, fccf);
+                    return false;
+                }
+                List<ItemStack> insertedOutput = new ArrayList<>();
+                if (!addOutputToInventorySafely(toAdd, outputInv, insertedOutput)) {
+                    rollbackOutput(outputInv, insertedOutput);
+                    restoreInput(toRemove, inputInv, fccf);
+                    restoreInput(input, inputInv, fccf);
+                    return false;
+                }
+                break;
             }
         }
         logAfterRecipeRun(combo, fccf);
@@ -133,18 +166,12 @@ public class CompactingRecipe extends InputRecipe {
     }
 
     /**
-     * Removes the amount required to compact the given ItemStack from the given inventory and adds a comapcted item to the inventory
-     *
-     * @param is
+     * @return A single compacted item made from the given stack
      */
-    private void compact(ItemStack is, Inventory inputInv, Inventory outputInv) {
-        ItemStack copy = is.clone();
-        copy.setAmount(getCompactStackSize(copy.getType()));
-        ItemMap toRemove = new ItemMap(copy);
-        if (toRemove.removeSafelyFrom(inputInv)) {
-            compactStack(copy);
-            outputInv.addItem(copy);
-        }
+    private ItemMap getCompactedOutput(ItemStack is) {
+        ItemStack compacted = is.clone();
+        compactStack(compacted);
+        return new ItemMap(compacted);
     }
 
     /**

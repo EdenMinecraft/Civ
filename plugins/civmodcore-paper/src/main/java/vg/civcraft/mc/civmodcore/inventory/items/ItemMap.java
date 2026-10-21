@@ -441,19 +441,45 @@ public class ItemMap {
      * @return True if this ItemMap's item representation would completly fit in the inventory, false if not
      */
     public boolean fitsIn(Inventory i) {
-        int size;
-        if (i instanceof PlayerInventory) {
-            size = 36;
-        } else {
-            size = i.getSize();
+        // Simulate the insertion slot by slot. Merging the inventory into an ItemMap would treat many partial
+        // stacks of the same item (like single items used as slot blockers) as if they occupied one slot
+        ItemStack[] contents = i.getStorageContents();
+        ItemStack[] simulated = new ItemStack[contents.length];
+        for (int slot = 0; slot < contents.length; slot++) {
+            simulated[slot] = contents[slot] == null ? null : contents[slot].clone();
         }
-        ItemMap invCopy = new ItemMap();
-        for (ItemStack is : i.getStorageContents()) {
-            invCopy.addItemStack(is);
+        int inventoryMaxStackSize = Math.max(1, i.getMaxStackSize());
+        for (Entry<ItemStack, Integer> entry : getAllItems().entrySet()) {
+            ItemStack template = entry.getKey();
+            int remaining = entry.getValue();
+            if (template == null || template.isEmpty() || remaining <= 0) {
+                continue;
+            }
+            int maxStackSize = Math.max(1, Math.min(template.getMaxStackSize(), inventoryMaxStackSize));
+            for (int slot = 0; slot < simulated.length && remaining > 0; slot++) {
+                ItemStack existing = simulated[slot];
+                if (existing == null || existing.isEmpty() || !existing.isSimilar(template)) {
+                    continue;
+                }
+                int moved = Math.min(remaining, Math.max(0, maxStackSize - existing.getAmount()));
+                existing.setAmount(existing.getAmount() + moved);
+                remaining -= moved;
+            }
+            for (int slot = 0; slot < simulated.length && remaining > 0; slot++) {
+                if (simulated[slot] != null && !simulated[slot].isEmpty()) {
+                    continue;
+                }
+                int moved = Math.min(remaining, maxStackSize);
+                ItemStack inserted = template.clone();
+                inserted.setAmount(moved);
+                simulated[slot] = inserted;
+                remaining -= moved;
+            }
+            if (remaining > 0) {
+                return false;
+            }
         }
-        ItemMap instanceCopy = this.clone();
-        instanceCopy.merge(invCopy);
-        return instanceCopy.getItemStackRepresentation().size() <= size;
+        return true;
     }
 
     /**
