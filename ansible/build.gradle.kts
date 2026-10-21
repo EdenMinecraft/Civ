@@ -20,7 +20,7 @@ dependencies {
     paperPlugin(project(path = ":plugins:hiddenore-paper"))
     paperPlugin(project(path = ":plugins:itemexchange-paper"))
     paperPlugin(project(path = ":plugins:jukealert-paper", configuration = "shadow"))
-    paperPlugin(project(path = ":plugins:kirabukkitgateway-paper", configuration = "shadow"))
+    //paperPlugin(project(path = ":plugins:kirabukkitgateway-paper", configuration = "shadow"))
     paperPlugin(project(path = ":plugins:namecolors-paper"))
     paperPlugin(project(path = ":plugins:namelayer-paper", configuration = "shadow"))
     paperPlugin(project(path = ":plugins:railswitch-paper"))
@@ -54,7 +54,7 @@ dependencies {
     gammaPlugin(project(path = ":plugins:simpleadminhacks-paper"))
     gammaPlugin(project(path = ":plugins:heliodor-paper"))
     gammaPlugin(project(path = ":plugins:secureboot-paper"))
-    gammaPlugin(project(path = ":plugins:kirabukkitgateway-paper", configuration = "shadow"))
+    //gammaPlugin(project(path = ":plugins:kirabukkitgateway-paper", configuration = "shadow"))
 
     pvpPlugin(project(path = ":plugins:banstick-paper", configuration = "shadow"))
     pvpPlugin(project(path = ":plugins:civduties-paper"))
@@ -70,7 +70,7 @@ dependencies {
 
     proxyPlugin(project(path = ":plugins:civproxy-velocity", configuration = "shadow"))
     proxyPlugin(project(path = ":plugins:announcements-velocity", configuration = "shadow"))
-    proxyPlugin(project(path = ":plugins:kiragateway-velocity", configuration = "shadow"))
+    //proxyPlugin(project(path = ":plugins:kiragateway-velocity", configuration = "shadow"))
 }
 
 val copyPaperPlugins = tasks.register<Copy>("copyPaperPlugins") {

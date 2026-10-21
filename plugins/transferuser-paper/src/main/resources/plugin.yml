@@ -1,0 +1,13 @@
+name: TransferUser
+version: ${version}
+main: com.github.longboyy.transferuser.TransferUser
+author: Longboyy
+description: Allows for easy transfer of group memberships and inventories between players who are transitioning from bedrock to java
+depend: [SimpleAdminHacks, NameLayer, InvSeePlusPlus]
+softdepend: [CombatTagPlus]
+api-version: 1.21.3
+commands:
+  transferuser: {}
+permissions:
+  transferuser.op:
+    default: op
