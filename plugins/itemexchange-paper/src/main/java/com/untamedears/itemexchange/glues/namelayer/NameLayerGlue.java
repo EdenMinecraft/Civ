@@ -22,13 +22,17 @@ public final class NameLayerGlue extends DependencyGlue {
     private final Listener listener = new Listener() {
         @EventHandler(ignoreCancelled = true)
         public void denyPurchaseIfNotGotPerms(final BrowseOrPurchaseEvent event) {
-            final GroupModifier modifier = event.getTrade().getInput().getModifiers().get(GroupModifier.class);
-            if (!Validation.checkValidity(modifier)
-                || PermissionsGlue.PURCHASE_PERMISSION.testPermission(
-                GroupManager.getGroup(modifier.getGroupId()), event.getBrowser())) {
+            // A group restriction on any of the trade's inputs restricts the whole trade.
+            for (final var input : event.getTrade().getInputs()) {
+                final GroupModifier modifier = input.getModifiers().get(GroupModifier.class);
+                if (!Validation.checkValidity(modifier)
+                    || PermissionsGlue.PURCHASE_PERMISSION.testPermission(
+                    GroupManager.getGroup(modifier.getGroupId()), event.getBrowser())) {
+                    continue;
+                }
+                event.limitToBrowsing();
                 return;
             }
-            event.limitToBrowsing();
         }
     };
 

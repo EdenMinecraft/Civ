@@ -29,6 +29,10 @@ public final class ItemExchangeConfig extends ConfigParser {
     private static int RELAY_REACH_DISTANCE;
     private static final Set<Material> RELAY_PERMEABLE_BLOCKS = new HashSet<>();
     private static ShapelessRecipe BULK_RULE_RECIPE;
+    private static final int DEFAULT_MAX_TRADE_INPUTS = 8;
+    private static final int DEFAULT_MAX_TRADE_OUTPUTS = 8;
+    private static int MAX_TRADE_INPUTS = DEFAULT_MAX_TRADE_INPUTS;
+    private static int MAX_TRADE_OUTPUTS = DEFAULT_MAX_TRADE_OUTPUTS;
 
     public ItemExchangeConfig(final ItemExchangePlugin plugin) {
         super(plugin);
@@ -42,6 +46,7 @@ public final class ItemExchangeConfig extends ConfigParser {
         parseCreateFromShop(config.getBoolean("createShopFromChest", true));
         parseRepairableItems(config.getStringList("repairables"));
         parseShopRelay(config.getConfigurationSection("shopRelay"));
+        parseTradeLimits(config.getConfigurationSection("tradeLimits"));
         return true;
     }
 
@@ -55,10 +60,27 @@ public final class ItemExchangeConfig extends ConfigParser {
         RELAY_RECURSION_LIMIT = 0;
         RELAY_REACH_DISTANCE = 0;
         RELAY_PERMEABLE_BLOCKS.clear();
+        MAX_TRADE_INPUTS = DEFAULT_MAX_TRADE_INPUTS;
+        MAX_TRADE_OUTPUTS = DEFAULT_MAX_TRADE_OUTPUTS;
         if (BULK_RULE_RECIPE != null) {
             RecipeManager.removeRecipe(BULK_RULE_RECIPE);
             BULK_RULE_RECIPE = null;
         }
+    }
+
+    private void parseTradeLimits(final ConfigurationSection config) {
+        if (config == null) {
+            LOGGER.info("No trade limits configured; using defaults.");
+            return;
+        }
+        MAX_TRADE_INPUTS = Math.max(config.getInt("maxInputs", DEFAULT_MAX_TRADE_INPUTS), 0);
+        LOGGER.info(MAX_TRADE_INPUTS > 0
+            ? "Max trade inputs parsed: " + MAX_TRADE_INPUTS
+            : "Max trade inputs unlimited.");
+        MAX_TRADE_OUTPUTS = Math.max(config.getInt("maxOutputs", DEFAULT_MAX_TRADE_OUTPUTS), 0);
+        LOGGER.info(MAX_TRADE_OUTPUTS > 0
+            ? "Max trade outputs parsed: " + MAX_TRADE_OUTPUTS
+            : "Max trade outputs unlimited.");
     }
 
     private void parseShopCompatibleBlocks(final List<String> config) {
@@ -269,6 +291,20 @@ public final class ItemExchangeConfig extends ConfigParser {
 
     public static boolean hasRelayCompatibleBlock(Material material) {
         return RELAY_COMPATIBLE_BLOCKS.contains(material);
+    }
+
+    /**
+     * @return The most input rules a single trade may have, or zero if unlimited.
+     */
+    public static int getMaxTradeInputs() {
+        return MAX_TRADE_INPUTS;
+    }
+
+    /**
+     * @return The most output rules a single trade may have, or zero if unlimited.
+     */
+    public static int getMaxTradeOutputs() {
+        return MAX_TRADE_OUTPUTS;
     }
 
     public static int getRelayRecursionLimit() {
