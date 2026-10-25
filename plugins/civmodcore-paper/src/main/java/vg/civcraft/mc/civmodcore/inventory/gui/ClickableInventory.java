@@ -14,8 +14,8 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitTask;
-import vg.civcraft.mc.civmodcore.CivModCorePlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
+import vg.civcraft.mc.civmodcore.scheduling.CivTask;
 
 /**
  * Represents an inventory filled with Clickables. Whenever one of those is
@@ -43,7 +43,7 @@ public class ClickableInventory {
 
     private IClickable[] clickables;
 
-    private List<BukkitTask> runnables;
+    private List<CivTask> runnables;
 
     private String name;
     private Runnable onClose;
@@ -193,7 +193,7 @@ public class ClickableInventory {
     public void showInventory(Player p, boolean eventSafe) {
         if (p != null) {
             if (eventSafe) {
-                Bukkit.getScheduler().runTask(CivModCorePlugin.getInstance(), () -> {
+                CivScheduler.runEntity(p, () -> {
                     p.openInventory(inventory);
                     openInventories.put(p.getUniqueId(), this);
                 });
@@ -245,7 +245,7 @@ public class ClickableInventory {
         inventory.setItem(slot, is);
     }
 
-    public void registerTask(BukkitTask runnable) {
+    public void registerTask(CivTask runnable) {
         this.runnables.add(runnable);
     }
 
@@ -310,7 +310,7 @@ public class ClickableInventory {
     private static void stopRunnables(ClickableInventory ci) {
         if (ci.inventory.getViewers().size() == 1) {
             // last one is closing
-            for (BukkitTask runnable : ci.runnables) {
+            for (CivTask runnable : ci.runnables) {
                 runnable.cancel();
             }
         }

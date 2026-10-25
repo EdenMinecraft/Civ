@@ -3,27 +3,28 @@ package vg.civcraft.mc.civmodcore.players.scoreboard.side;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
-import vg.civcraft.mc.civmodcore.CivModCorePlugin;
+import vg.civcraft.mc.civmodcore.scheduling.CivScheduler;
+import vg.civcraft.mc.civmodcore.scheduling.CivTask;
 
 public class CivScoreBoard {
 
     private String scoreName;
     private Map<UUID, String> currentScoreText;
-    private BukkitRunnable updater;
+    private CivTask updater;
 
     CivScoreBoard(String scoreName) {
         this.scoreName = scoreName;
-        this.currentScoreText = new TreeMap<>();
+        // Updater runs on the global region thread while set/hide/purge mutate from player region threads on Folia.
+        this.currentScoreText = new ConcurrentHashMap<>();
     }
 
     public String getName() {
@@ -34,30 +35,25 @@ public class CivScoreBoard {
         if (updater != null) {
             updater.cancel();
         }
-        updater = new BukkitRunnable() {
-
-            @Override
-            public void run() {
-                Iterator<Entry<UUID, String>> iter = currentScoreText.entrySet().iterator();
-                while (iter.hasNext()) {
-                    Entry<UUID, String> entry = iter.next();
-                    Player player = Bukkit.getPlayer(entry.getKey());
-                    if (player != null) {
-                        String newText = updateFunction.apply(player, entry.getValue());
-                        if (newText == null) {
-                            hideForPlayer(player);
-                            iter.remove();
-                            continue;
-                        }
-                        if (!newText.equals(entry.getValue())) {
-                            internalUpdate(player, entry.getValue(), newText);
-                            entry.setValue(newText);
-                        }
+        updater = CivScheduler.runGlobalTimer(() -> {
+            Iterator<Entry<UUID, String>> iter = currentScoreText.entrySet().iterator();
+            while (iter.hasNext()) {
+                Entry<UUID, String> entry = iter.next();
+                Player player = Bukkit.getPlayer(entry.getKey());
+                if (player != null) {
+                    String newText = updateFunction.apply(player, entry.getValue());
+                    if (newText == null) {
+                        hideForPlayer(player);
+                        iter.remove();
+                        continue;
+                    }
+                    if (!newText.equals(entry.getValue())) {
+                        internalUpdate(player, entry.getValue(), newText);
+                        entry.setValue(newText);
                     }
                 }
             }
-        };
-        updater.runTaskTimer(CivModCorePlugin.getInstance(), delay, delay);
+        }, delay, delay);
     }
 
     public void set(Player p, String newText) {
