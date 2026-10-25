@@ -336,7 +336,7 @@ public class DonumDAO {
             while (rs.next()) {
                 int id = rs.getInt(1);
                 Blob blob = rs.getBlob(2);
-                Date date = rs.getDate(3);
+                Date date = rs.getTimestamp(3);
                 boolean returned = rs.getBoolean(4);
                 int blobLength = (int) blob.length();
                 byte[] blobAsBytes = blob.getBytes(1, blobLength);

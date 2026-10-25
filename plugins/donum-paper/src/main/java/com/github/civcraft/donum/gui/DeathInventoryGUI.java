@@ -125,8 +125,9 @@ public class DeathInventoryGUI {
                 ItemUtils.setDisplayName(returnStack, ChatColor.GOLD + "Return items");
                 ItemUtils.addLore(
                     returnStack,
-                    ChatColor.GOLD
-                        + "This inventory was already returned previously. You may return it again, if you know what you are doing");
+                    i.wasReturned() ?
+                        ChatColor.RED + "This inventory was already returned previously. You may return it again, if you know what you are doing" :
+                        ChatColor.GREEN + "This inventory was not returned yet.");
                 ItemUtils.addLore(returnStack, ChatColor.RED + "You can not undo this!");
                 ci.setSlot(new Clickable(returnStack) {
 
