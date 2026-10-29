@@ -3,12 +3,15 @@ package vg.civcraft.mc.civmodcore.players.settings;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import vg.civcraft.mc.civmodcore.CivModCorePlugin;
@@ -115,34 +118,68 @@ public final class PlayerSettingAPI {
      * Saves all values to their save files
      */
     public static void saveAll() {
-        for (Map.Entry<String, List<PlayerSetting<?>>> pluginEntry : SETTINGS_BY_PLUGIN.entrySet()) {
-            if (pluginEntry.getValue().isEmpty()) {
+        write(snapshot());
+    }
+
+    /**
+     * Copies all values on the calling thread, which must be the main thread, then writes them to their save files
+     * asynchronously. Used for periodic saves, so values survive the server being killed before shutdown finishes
+     */
+    public static void saveAllAsync() {
+        Map<File, Map<String, Map<String, String>>> snapshot = snapshot();
+        Bukkit.getScheduler().runTaskAsynchronously(CivModCorePlugin.getInstance(), () -> write(snapshot));
+    }
+
+    /**
+     * @return Serialized values of every setting, by save file and then by setting identifier
+     */
+    private static Map<File, Map<String, Map<String, String>>> snapshot() {
+        Map<File, Map<String, Map<String, String>>> result = new HashMap<>();
+        for (List<PlayerSetting<?>> pluginSettings : SETTINGS_BY_PLUGIN.values()) {
+            if (pluginSettings.isEmpty()) {
                 continue;
             }
-            File folder = pluginEntry.getValue().get(0).getOwningPlugin().getDataFolder();
+            File file = new File(pluginSettings.get(0).getOwningPlugin().getDataFolder(), FILE_NAME);
+            Map<String, Map<String, String>> values = new HashMap<>();
+            for (PlayerSetting<?> setting : pluginSettings) {
+                values.put(setting.getIdentifier(), setting.dumpAllSerialized());
+            }
+            result.put(file, values);
+        }
+        return result;
+    }
+
+    // Synchronized so a periodic save and the shutdown save never write the same file at once
+    private static synchronized void write(Map<File, Map<String, Map<String, String>>> snapshot) {
+        for (Map.Entry<File, Map<String, Map<String, String>>> fileEntry : snapshot.entrySet()) {
+            File file = fileEntry.getKey();
+            File folder = file.getParentFile();
             if (!folder.isDirectory()) {
                 folder.mkdirs();
             }
-            File file = new File(folder, FILE_NAME);
             YamlConfiguration config;
             if (file.isFile()) {
                 config = YamlConfiguration.loadConfiguration(file);
             } else {
                 config = new YamlConfiguration();
             }
-            for (PlayerSetting<?> setting : pluginEntry.getValue()) {
+            for (Map.Entry<String, Map<String, String>> settingEntry : fileEntry.getValue().entrySet()) {
                 ConfigurationSection section;
-                if (config.isConfigurationSection(setting.getIdentifier())) {
-                    section = config.getConfigurationSection(setting.getIdentifier());
+                if (config.isConfigurationSection(settingEntry.getKey())) {
+                    section = config.getConfigurationSection(settingEntry.getKey());
                 } else {
-                    section = config.createSection(setting.getIdentifier());
+                    section = config.createSection(settingEntry.getKey());
                 }
-                for (Map.Entry<String, String> entry : setting.dumpAllSerialized().entrySet()) {
+                for (Map.Entry<String, String> entry : settingEntry.getValue().entrySet()) {
                     section.set(entry.getKey(), entry.getValue());
                 }
             }
+            // Write to a temporary file and move it over, so being killed mid-write can't leave a broken file
+            File temp = new File(folder, FILE_NAME + ".tmp");
             try {
-                config.save(file);
+                config.save(temp);
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
             } catch (IOException e) {
                 CivModCorePlugin.getInstance().severe("Failed to save settings", e);
             }
