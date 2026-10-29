@@ -34,6 +34,7 @@ public class CivModCorePlugin extends ACivMod {
     }
 
     private static CivModCorePlugin instance;
+    private static final long SETTINGS_SAVE_INTERVAL_TICKS = 20L * 60 * 5;
 
     private CivModCoreConfig config;
     private GlobalChunkMetaManager chunkMetaManager;
@@ -88,6 +89,9 @@ public class CivModCorePlugin extends ACivMod {
         EnchantUtils.loadEnchantAbbreviations();
         BottomLineAPI.init();
         this.skinCache = new SkinCache(this, this.config.getSkinCacheThreads());
+        // Save player settings regularly, so a shutdown that gets killed before reaching onDisable loses little
+        Bukkit.getScheduler().runTaskTimer(this, PlayerSettingAPI::saveAllAsync, SETTINGS_SAVE_INTERVAL_TICKS,
+            SETTINGS_SAVE_INTERVAL_TICKS);
 
         if (this.config.getChunkLoadingStatistics())
             LoadStatisticManager.enable();
@@ -95,6 +99,8 @@ public class CivModCorePlugin extends ACivMod {
 
     @Override
     public void onDisable() {
+        // First, so nothing below throwing can skip it
+        PlayerSettingAPI.saveAll();
         Bukkit.getOnlinePlayers().forEach(HumanEntity::closeInventory);
         ChunkMetaAPI.saveAll();
         this.chunkMetaManager.disableWorlds();
@@ -105,7 +111,6 @@ public class CivModCorePlugin extends ACivMod {
             this.database = null;
         }
         DialogManager.resetDialogs();
-        PlayerSettingAPI.saveAll();
         ConfigurationSerialization.unregisterClass(DatabaseCredentials.class);
         if (this.commands != null) {
             this.commands.reset();
