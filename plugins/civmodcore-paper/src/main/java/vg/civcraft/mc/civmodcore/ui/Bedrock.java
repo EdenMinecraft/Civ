@@ -79,11 +79,17 @@ public final class Bedrock {
     private static Component stripOrNull(@NotNull final Component component) {
         if (component instanceof final ObjectComponent object) {
             final List<Component> children = stripChildren(object.children());
-            final boolean nothingLeft = isBlank(object.fallback()) && children.stream().allMatch(Bedrock::isBlank);
+
+            final Component fallback = object.fallback();
+            final boolean nothingLeft = (fallback == null || isBlank(fallback)) && children.stream().allMatch(Bedrock::isBlank);
             if (nothingLeft) {
                 return null;
             }
-            return Component.text().style(object.style()).append(object.fallback()).append(children).build();
+            final TextComponent.Builder builder = Component.text().style(object.style());
+            if (fallback != null) {
+                builder.append(fallback);
+            }
+            return builder.append(children).build();
         }
         final List<Component> children = stripChildren(component.children());
         return children == component.children() ? component : component.children(children);

@@ -36,6 +36,7 @@ public class VariantRecipe extends InputRecipe {
     private final Map<Material, Material> inputToOutputMap;
     private final String genericInputName;
     private final String genericOutputName;
+    private final String variantPrefix;
 
     public VariantRecipe(
         String identifier,
@@ -45,7 +46,8 @@ public class VariantRecipe extends InputRecipe {
         ItemStack baseVariantInput,
         ItemMap fixedOutput,
         ItemStack baseVariantOutput,
-        Map<Material, Material> inputToOutputMap
+        Map<Material, Material> inputToOutputMap,
+        String variantPrefix
     ) {
         super(identifier, name, productionTime, fixedInput);
         this.fixedInput = fixedInput;
@@ -53,30 +55,36 @@ public class VariantRecipe extends InputRecipe {
         this.fixedOutput = fixedOutput;
         this.baseVariantOutput = baseVariantOutput;
         this.inputToOutputMap = new LinkedHashMap<>(inputToOutputMap);
-        this.genericInputName = computeGenericName(baseVariantInput);
-        this.genericOutputName = computeGenericName(baseVariantOutput);
+        this.variantPrefix = variantPrefix;
+        this.genericInputName = "Any " + stripVariantPrefix(baseVariantInput);
+        this.genericOutputName = "Any " + stripVariantPrefix(baseVariantOutput);
     }
 
-    private static String computeGenericName(ItemStack item) {
+    /**
+     * Removes the variant prefix words (e.g. "Oak" for OAK, "Dark Oak" for DARK_OAK) from the item name, so
+     * "Stripped Oak Log" becomes "Stripped Log". Falls back to dropping the first word if the prefix is not found.
+     */
+    private String stripVariantPrefix(ItemStack item) {
         String name = ItemUtils.getItemName(item);
-        int firstSpace = name.indexOf(' ');
-
-        if (firstSpace != -1) {
-            return "Any" + name.substring(firstSpace);
+        String prefixWords = variantPrefix.replace('_', ' ');
+        String lowerName = name.toLowerCase();
+        String lowerPrefix = prefixWords.toLowerCase();
+        int index = lowerName.indexOf(lowerPrefix);
+        while (index != -1) {
+            int end = index + lowerPrefix.length();
+            boolean startOk = index == 0 || name.charAt(index - 1) == ' ';
+            boolean endOk = end == name.length() || name.charAt(end) == ' ';
+            if (startOk && endOk) {
+                return (name.substring(0, index) + name.substring(end)).trim().replaceAll(" {2,}", " ");
+            }
+            index = lowerName.indexOf(lowerPrefix, index + 1);
         }
-
-        return "Any " + name;
+        int firstSpace = name.indexOf(' ');
+        return firstSpace != -1 ? name.substring(firstSpace + 1) : name;
     }
 
-    private static String computeMatchingName(ItemStack item) {
-        String name = ItemUtils.getItemName(item);
-        int firstSpace = name.indexOf(' ');
-        
-        if (firstSpace != -1) {
-            return "Matching" + name.substring(firstSpace);
-        }
-
-        return "Matching " + name;
+    private String computeMatchingName(ItemStack item) {
+        return "Matching " + stripVariantPrefix(item);
     }
 
     public boolean acceptsInputMaterial(Material material) {

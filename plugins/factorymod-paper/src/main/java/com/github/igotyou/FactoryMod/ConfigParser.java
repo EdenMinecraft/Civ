@@ -619,20 +619,28 @@ public class ConfigParser {
                 ConfigurationSection overridesSection = config.getConfigurationSection("variant_overrides");
                 Map<Material, Material> variantMap = new LinkedHashMap<>();
                 String baseInputName = variantInput.getType().name();
-                int firstUnderscore = baseInputName.indexOf('_');
-                String basePrefix = firstUnderscore != -1 ? baseInputName.substring(0, firstUnderscore) : baseInputName;
-                String inputSuffix = firstUnderscore != -1 ? baseInputName.substring(firstUnderscore) : "";
                 String baseOutputName = variantOutput.getType().name();
-                int outFirstUnderscore = baseOutputName.indexOf('_');
-                String outputSuffix = outFirstUnderscore != -1 ? baseOutputName.substring(outFirstUnderscore) : "";
-                boolean outputHasSuffix = outFirstUnderscore != -1;
+                // The base prefix is the longest configured prefix appearing as a whole token in the base input,
+                // so STRIPPED_OAK_LOG resolves to OAK rather than STRIPPED
+                String basePrefix = null;
                 for (String prefix : variantPrefixes) {
-                    String inputName = prefix + inputSuffix;
-                    Material inputMat = Material.getMaterial(inputName);
+                    if (replaceVariantToken(baseInputName, prefix, prefix) != null
+                        && (basePrefix == null || prefix.length() > basePrefix.length())) {
+                        basePrefix = prefix;
+                    }
+                }
+                if (basePrefix == null) {
+                    int firstUnderscore = baseInputName.indexOf('_');
+                    basePrefix = firstUnderscore != -1 ? baseInputName.substring(0, firstUnderscore) : baseInputName;
+                }
+                boolean outputHasPrefix = replaceVariantToken(baseOutputName, basePrefix, basePrefix) != null;
+                for (String prefix : variantPrefixes) {
+                    String inputName = replaceVariantToken(baseInputName, basePrefix, prefix);
+                    Material inputMat = inputName == null ? null : Material.getMaterial(inputName);
                     Material outputMat;
                     String outputName;
-                    if (outputHasSuffix) {
-                        outputName = prefix + outputSuffix;
+                    if (outputHasPrefix) {
+                        outputName = replaceVariantToken(baseOutputName, basePrefix, prefix);
                         outputMat = Material.getMaterial(outputName);
                     } else {
                         outputName = baseOutputName;
@@ -655,7 +663,9 @@ public class ConfigParser {
                             if (explicitOutput != null) {
                                 overrideOutput = Material.getMaterial(explicitOutput);
                             } else {
-                                overrideOutput = outputHasSuffix ? Material.getMaterial(key + outputSuffix) : variantOutput.getType();
+                                overrideOutput = outputHasPrefix
+                                    ? Material.getMaterial(replaceVariantToken(baseOutputName, basePrefix, key))
+                                    : variantOutput.getType();
                             }
                             if (overrideInput != null && overrideOutput != null) {
                                 variantMap.put(overrideInput, overrideOutput);
@@ -668,7 +678,7 @@ public class ConfigParser {
                 }
                 variantMap.putIfAbsent(variantInput.getType(), variantOutput.getType());
                 result = new VariantRecipe(identifier, name, productionTime, input, variantInput,
-                    fixedOutputMap, variantOutput, variantMap);
+                    fixedOutputMap, variantOutput, variantMap, basePrefix);
                 break;
             case "COMPACT":
                 String compactedLore = config.getString("compact_lore",
@@ -1065,6 +1075,24 @@ public class ConfigParser {
             plugin.info("Parsed recipe " + name);
         }
         return result;
+    }
+
+    /**
+     * Replaces the first occurrence of token in name, where token must be bounded by underscores or the
+     * ends of the name. Returns null if the token does not occur.
+     */
+    private static String replaceVariantToken(String name, String token, String replacement) {
+        int index = name.indexOf(token);
+        while (index != -1) {
+            int end = index + token.length();
+            boolean startOk = index == 0 || name.charAt(index - 1) == '_';
+            boolean endOk = end == name.length() || name.charAt(end) == '_';
+            if (startOk && endOk) {
+                return name.substring(0, index) + replacement + name.substring(end);
+            }
+            index = name.indexOf(token, index + 1);
+        }
+        return null;
     }
 
     private static ItemStack parseFirstItem(ConfigurationSection config) {
