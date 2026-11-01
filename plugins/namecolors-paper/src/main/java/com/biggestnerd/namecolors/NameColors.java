@@ -4,6 +4,7 @@ package com.biggestnerd.namecolors;
 import me.neznamy.tab.api.TabAPI;
 import me.neznamy.tab.api.TabPlayer;
 import me.neznamy.tab.shared.TAB;
+import me.neznamy.tab.shared.config.PropertyConfiguration;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
@@ -56,7 +57,17 @@ public class NameColors extends ACivMod implements Listener {
         if (getServer().getPluginManager().isPluginEnabled("TAB")) {
             Bukkit.getScheduler().runTaskLater(this, () -> {
                 // For some reason setPrefix directly doesn't work
-                TAB.getInstance().getConfiguration().getUsers().setProperty(player.getName(), "tabprefix", null, null, null);
+                PropertyConfiguration users = TAB.getInstance().getConfiguration().getUsers();
+                String name = player.getName();
+                if (!users.getGlobalSettings(name).containsKey("tabprefix")) {
+                    // Nothing to clear
+                    return;
+                }
+                users.setProperty(name, "tabprefix", null, null, null);
+                if (users.getGlobalSettings(name).isEmpty() && users.getPerWorldSettings(name).isEmpty()
+                    && users.getPerServerSettings(name).isEmpty()) {
+                    users.remove(name);
+                }
                 TAB.getInstance().getFeatureManager().onGroupChange(TAB.getInstance().getPlayer(player.getUniqueId()));
             }, 20L);
         }
