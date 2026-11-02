@@ -270,7 +270,7 @@ public class DataManager {
         }
 
         this.logger.log(Level.INFO, "Clearing queue and shutting down queue minders");
-        this.dequeueWorkers.shutdown();
+        this.dequeueWorkers.shutdownNow();
         this.sampleQueue.clear();
 
         this.logger.log(Level.INFO, "Shutting down scheduled tasks");
@@ -501,6 +501,12 @@ public class DataManager {
             try {
                 sample = parent.sampleQueue.take();
             } catch (InterruptedException ie) {
+                if (!parent.active) {
+                    // Interrupted by shutdown
+                    parent.roughWorkerCount--;
+                    nanoTimeCumulativeAvg = -1.0;
+                    return;
+                }
                 parent.logger.log(Level.WARNING, "While waiting on a queue, interrupted:", ie);
             }
 
@@ -582,8 +588,10 @@ public class DataManager {
                 try {
                     this.scheduler.get().execute(this);
                 } catch (RejectedExecutionException ree) {
-                    parent.logger.log(Level.WARNING, "Unable to reschedule {0} minder.", this.toString());
-                    parent.logger.log(Level.WARNING, "Failure based on this exception:", ree);
+                    if (parent.active) {
+                        parent.logger.log(Level.WARNING, "Unable to reschedule {0} minder.", this.toString());
+                        parent.logger.log(Level.WARNING, "Failure based on this exception:", ree);
+                    }
                     parent.roughWorkerCount--;
                     nanoTimeCumulativeAvg = -1.0;
                 }
