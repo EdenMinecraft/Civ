@@ -299,14 +299,14 @@ public class CivChat2Manager {
 
     /**
      * Rank stars, the player's face, then the name - no brackets. Used by every chat surface and by join/quit lines.
-     * A name without a chosen colour is SUBJECT, so it never inherits the surrounding line's colour.
+     * A name without a chosen colour is GRAY, so it never inherits the surrounding line's colour.
      */
     public Component identityTag(Player player) {
         Component name = customNames.containsKey(player.getUniqueId())
             ? customNames.get(player.getUniqueId())
             : player.displayName();
         return Component.text()
-            .color(CivText.SUBJECT)
+            .color(NamedTextColor.GRAY)
             .append(starManager.getPrefix(player))
             .append(CivText.head(player))
             .append(Component.space())
