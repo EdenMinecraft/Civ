@@ -56,6 +56,7 @@ public class MobListener implements Listener {
             name.endsWith("_PICKAXE") ||
             name.endsWith("_SHOVEL") ||
             name.endsWith("_HOE") ||
+            name.endsWith("_SPEAR") ||
             material == Material.BOW ||
             material == Material.CROSSBOW ||
             material == Material.TRIDENT;
