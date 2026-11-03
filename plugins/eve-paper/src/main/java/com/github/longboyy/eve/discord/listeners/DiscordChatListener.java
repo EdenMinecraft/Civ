@@ -9,7 +9,7 @@ public class DiscordChatListener extends DiscordListener {
 
     @Subscribe
     public void onDiscordChat(DiscordGuildMessagePreProcessEvent event) {
-
+        
     }
 
 }

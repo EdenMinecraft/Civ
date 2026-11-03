@@ -41,10 +41,13 @@ public class EvePlugin extends ACivMod {
         this.snitchListener = new SnitchListener(this);
         this.relayManager.reloadRelays();
 
-        if(DiscordSRV.getPlugin().getJda().getStatus() == JDA.Status.CONNECTED){
+        // Register the provider up front so DiscordSRV's own ready-time sync includes our commands,
+        // and keep the ready listener subscribed so DiscordSRV reconnects re-sync them too.
+        this.discordCommandManager.registerProvider();
+        this.discordReadyListener.register();
+        JDA jda = DiscordSRV.getPlugin().getJda();
+        if(jda != null && jda.getStatus() == JDA.Status.CONNECTED){
             this.setupDiscord();
-        }else{
-            this.discordReadyListener.register();
         }
         this.registerListener(this.snitchListener);
 
@@ -55,6 +58,7 @@ public class EvePlugin extends ACivMod {
     public void onDisable() {
         super.onDisable();
         this.discordReadyListener.unregister();
+        this.discordCommandManager.unregisterProvider();
         HandlerList.unregisterAll(this);
     }
 
