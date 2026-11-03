@@ -1,6 +1,8 @@
 package vg.civcraft.mc.civchat2.utility;
 
 import java.util.UUID;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import vg.civcraft.mc.civchat2.CivChat2;
@@ -27,6 +29,7 @@ public class CivChat2SettingsManager {
     private DisplayLocationSetting afkStatusLocation;
     private BooleanSetting showGroupColors;
     private BooleanSetting messageSound;
+    private EnumSetting<PrivateMessageColor> privateMessageColor;
 
     public CivChat2SettingsManager() {
         initSettings();
@@ -85,6 +88,11 @@ public class CivChat2SettingsManager {
         messageSound = new BooleanSetting(CivChat2.getInstance(), true, "Private message sound", "privateMessageSound",
             "Should a sound play when you receive a private message?");
         PlayerSettingAPI.registerSetting(messageSound, menu);
+
+        privateMessageColor = new EnumSetting<>(CivChat2.getInstance(), PrivateMessageColor.LIGHT_PURPLE,
+            "Private message color", "privateMessageColor", new ItemStack(Material.PINK_DYE),
+            "The color of message text in /msg and /r", true, PrivateMessageColor.class);
+        PlayerSettingAPI.registerSetting(privateMessageColor, menu);
     }
 
     public LongSetting getGlobalChatMuteSetting() {
@@ -137,6 +145,40 @@ public class CivChat2SettingsManager {
 
     public boolean getMessageSound(UUID uuid) {
         return messageSound.getValue(uuid);
+    }
+
+    public TextColor getPrivateMessageColor(UUID uuid) {
+        return privateMessageColor.getValue(uuid).color;
+    }
+
+    public enum PrivateMessageColor {
+        LIGHT_PURPLE(NamedTextColor.LIGHT_PURPLE),
+        DARK_PURPLE(NamedTextColor.DARK_PURPLE),
+        LAVENDER(TextColor.color(0xC88FD9)),
+        PALE_LAVENDER(TextColor.color(0xD8B4E2)),
+        PINK(TextColor.color(0xF5A9D0)),
+        RED(NamedTextColor.RED),
+        DARK_RED(NamedTextColor.DARK_RED),
+        ORANGE(TextColor.color(0xFFA040)),
+        GOLD(NamedTextColor.GOLD),
+        YELLOW(NamedTextColor.YELLOW),
+        GREEN(NamedTextColor.GREEN),
+        DARK_GREEN(NamedTextColor.DARK_GREEN),
+        MINT(TextColor.color(0x9EF0C0)),
+        AQUA(NamedTextColor.AQUA),
+        DARK_AQUA(NamedTextColor.DARK_AQUA),
+        LIGHT_BLUE(TextColor.color(0x8CC8FF)),
+        BLUE(NamedTextColor.BLUE),
+        DARK_BLUE(NamedTextColor.DARK_BLUE),
+        WHITE(NamedTextColor.WHITE),
+        GRAY(NamedTextColor.GRAY),
+        DARK_GRAY(NamedTextColor.DARK_GRAY);
+
+        public final TextColor color;
+
+        PrivateMessageColor(TextColor color) {
+            this.color = color;
+        }
     }
 
     public enum KillMessageFormat {

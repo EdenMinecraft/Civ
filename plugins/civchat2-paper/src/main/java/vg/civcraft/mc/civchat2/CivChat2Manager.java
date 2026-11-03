@@ -191,8 +191,8 @@ public class CivChat2Manager {
         replyList.put(receiver.getUniqueId(), sender.getUniqueId());
         replyList.put(sender.getUniqueId(), receiver.getUniqueId());
 
-        sender.sendMessage(Bedrock.adapt(sender, privateLine(CivText.info("You"), receiverName, chatMessage)));
-        receiver.sendMessage(Bedrock.adapt(receiver, privateLine(senderName, CivText.info("you"), chatMessage)));
+        sender.sendMessage(Bedrock.adapt(sender, privateLine(sender, CivText.info("You"), receiverName, chatMessage)));
+        receiver.sendMessage(Bedrock.adapt(receiver, privateLine(receiver, senderName, CivText.info("you"), chatMessage)));
         if (instance.getCivChat2SettingsManager().getMessageSound(receiver.getUniqueId())) {
             receiver.playSound(MESSAGE_SOUND);
         }
@@ -207,7 +207,8 @@ public class CivChat2Manager {
         }
     }
 
-    private static Component privateLine(Component from, Component to, Component message) {
+    private Component privateLine(Player viewer, Component from, Component to, Component message) {
+        TextColor messageColor = instance.getCivChat2SettingsManager().getPrivateMessageColor(viewer.getUniqueId());
         Component arrow = Component.text(" → ", CivText.MUTED);
 
         return Component.text()
@@ -215,7 +216,7 @@ public class CivChat2Manager {
             .append(arrow)
             .append(to)
             .append(Component.text(" » ", CivText.MUTED))
-            .append(Component.empty().color(NamedTextColor.WHITE).append(message))
+            .append(Component.empty().color(messageColor).append(message))
             .build();
     }
 
@@ -298,14 +299,14 @@ public class CivChat2Manager {
 
     /**
      * Rank stars, the player's face, then the name - no brackets. Used by every chat surface and by join/quit lines.
-     * A name without a chosen colour is SUBJECT, so it never inherits the surrounding line's colour.
+     * A name without a chosen colour is GRAY, so it never inherits the surrounding line's colour.
      */
     public Component identityTag(Player player) {
         Component name = customNames.containsKey(player.getUniqueId())
             ? customNames.get(player.getUniqueId())
             : player.displayName();
         return Component.text()
-            .color(CivText.SUBJECT)
+            .color(NamedTextColor.GRAY)
             .append(starManager.getPrefix(player))
             .append(CivText.head(player))
             .append(Component.space())

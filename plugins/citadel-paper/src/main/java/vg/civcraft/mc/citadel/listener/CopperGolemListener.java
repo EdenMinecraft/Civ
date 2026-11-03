@@ -79,6 +79,15 @@ public class CopperGolemListener implements Listener {
             return;
         }
         Block head = event.getLocation().getBlock();
+        if (!plugin.getConfigManager().copperGolemsEnabled()) {
+            event.setCancelled(true);
+            UUID placer = getPumpkinPlacer(head);
+            Player player = placer == null ? null : Bukkit.getPlayer(placer);
+            if (player != null) {
+                CivUI.error(player, "Copper golems are disabled");
+            }
+            return;
+        }
         boolean anyReinforced = false;
         boolean allReinforced = true;
         Reinforcement groupRein = null;
@@ -141,6 +150,11 @@ public class CopperGolemListener implements Listener {
     @EventHandler
     public void restrictContainers(ItemTransportingEntityValidateTargetEvent event) {
         if (!(event.getEntity() instanceof CopperGolem golem) || !event.isAllowed()) {
+            return;
+        }
+        // Golems stop moving items between any containers when enabled
+        if (!plugin.getConfigManager().copperGolemsEnabled()) {
+            event.setAllowed(false);
             return;
         }
         Reinforcement rein = ReinforcementLogic.getReinforcementProtecting(event.getBlock());

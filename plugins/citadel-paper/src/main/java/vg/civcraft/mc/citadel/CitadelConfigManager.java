@@ -50,6 +50,7 @@ public class CitadelConfigManager extends ConfigParser {
     private AdminSetting<Boolean> logMessages;
 
     private AdminSetting<Boolean> ctvEnabled;
+    private AdminSetting<Boolean> copperGolemsEnabled;
 
     private long globalDecayTimer;
     private double globalDecayMultiplier;
@@ -181,6 +182,10 @@ public class CitadelConfigManager extends ConfigParser {
         return ctvEnabled;
     }
 
+    public boolean copperGolemsEnabled() {
+        return copperGolemsEnabled.getValue();
+    }
+
     @Override
     protected boolean parseInternal(ConfigurationSection config) {
         database = ManagedDatasource.construct((ACivMod) plugin, (DatabaseCredentials) config.get("database"));
@@ -213,6 +218,8 @@ public class CitadelConfigManager extends ConfigParser {
         AdminSettingAPI.setPluginIcon(plugin, new ItemStack(Material.OBSIDIAN));
         AdminMenuSection menu = AdminSettingAPI.getPluginMenu(plugin);
         ctvEnabled = toggle(menu, "ctvEnabled", "CTV Enabled?", true, "Should /ctv be enabled?");
+        copperGolemsEnabled = toggle(menu, "copperGolemsEnabled", "Copper golems enabled?", true,
+            "When off, copper golems can't be built and existing ones can't use any container");
         hangersInheritReinforcements = toggle(menu, "hangers_inherit_reinforcement", "Hangers inherit reinforcement",
             false, "Item frames and paintings are protected by the reinforcement they hang on");
         redstoneRange = AdminSettingAPI.registerSetting(new DoubleSetting(javaPlugin, 3.0, "Redstone distance",
