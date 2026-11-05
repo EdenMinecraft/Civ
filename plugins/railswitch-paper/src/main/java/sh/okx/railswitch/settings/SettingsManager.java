@@ -3,9 +3,10 @@ package sh.okx.railswitch.settings;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import sh.okx.railswitch.RailSwitchPlugin;
+import vg.civcraft.mc.civmodcore.ui.CivText;
+import vg.civcraft.mc.civmodcore.ui.CivUI;
 
 /**
  * Manages the initialisation and registration of menu settings.
@@ -72,14 +73,14 @@ public final class SettingsManager {
                 resetSetting.resetPlayerDestination(player);
                 // Do not put a message here since the message is sent in the method above.
             } else {
-                player.sendMessage(ChatColor.RED + "Could not reset your destination.");
+                CivUI.error(player, "Your destination couldn't be cleared");
             }
         } else {
             if (destSetting != null) {
                 destSetting.setValue(player, destination);
-                player.sendMessage(ChatColor.GREEN + "Destination set to: " + destination);
+                CivUI.success(player, "Your destination is now ", CivText.value(destination));
             } else {
-                player.sendMessage(ChatColor.RED + "Could not set your destination.");
+                CivUI.error(player, "Your destination couldn't be set");
             }
         }
     }

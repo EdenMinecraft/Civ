@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
@@ -23,7 +24,9 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import vg.civcraft.mc.civmodcore.players.settings.AdminSetting;
 import vg.civcraft.mc.civmodcore.players.settings.AdminSettingAPI;
+import vg.civcraft.mc.civmodcore.players.settings.PlayerSettingAPI;
 import vg.civcraft.mc.civmodcore.players.settings.gui.AdminMenuSection;
+import vg.civcraft.mc.civmodcore.players.settings.gui.MenuSection;
 import vg.civcraft.mc.civmodcore.players.settings.impl.BooleanSetting;
 import vg.civcraft.mc.civmodcore.players.settings.impl.IntegerSetting;
 
@@ -34,6 +37,8 @@ public final class Settings {
     private final CombatTagPlus plugin;
 
     // Gameplay values admins can change live through /adminconfig, the rest is only read from the config file
+    private BooleanSetting logoutSound;
+
     private AdminSetting<Integer> tagDuration;
     private AdminSetting<Integer> logoutWaitTime;
     private AdminSetting<Integer> npcDespawnTime;
@@ -69,6 +74,19 @@ public final class Settings {
         defaults.set("disabled-worlds", new ArrayList<>());
         defaults.set("command-blacklist", new ArrayList<>());
         defaults.set("command-whitelist", new ArrayList<>());
+    }
+
+    public void registerPlayerSettings() {
+        MenuSection menu = PlayerSettingAPI.getMainMenu().createMenuSection("Combat Tag",
+            "Options related to combat tagging and safe logout.", new ItemStack(Material.IRON_SWORD));
+
+        logoutSound = new BooleanSetting(plugin, true, "Safe logout sound", "ctplusLogoutSound",
+            "Should the /logout countdown play a sound each second?");
+        PlayerSettingAPI.registerSetting(logoutSound, menu);
+    }
+
+    public boolean playLogoutSound(UUID player) {
+        return logoutSound == null || logoutSound.getValue(player);
     }
 
     /**

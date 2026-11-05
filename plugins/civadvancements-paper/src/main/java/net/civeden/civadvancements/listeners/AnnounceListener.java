@@ -52,8 +52,11 @@ public class AnnounceListener implements Listener {
             .build();
         // Sent per player instead of through the event, so Bedrock players get it without the head
         event.message(null);
+        boolean civChat = Bukkit.getPluginManager().isPluginEnabled("CivChat2");
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(Bedrock.adapt(player, message));
+            player.sendMessage(civChat
+                ? CivChat2.getInstance().getCivChat2Manager().adapt(player, message)
+                : Bedrock.adapt(player, message));
         }
         Bukkit.getConsoleSender().sendMessage(message);
     }

@@ -90,15 +90,23 @@ public final class SafeLogoutTask extends BukkitRunnable {
 			String remaining = plugin.getSettings().formatDuration(remainingSeconds);
 			// Escalates as the timer runs down
 			TextColor color;
+			Sound sound;
+			float pitch;
 			if (remainingSeconds <= 3) {
 				color = CivText.ERROR;
-				player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.6f);
+				sound = Sound.BLOCK_NOTE_BLOCK_PLING;
+				pitch = 1.6f;
 			} else if (remainingSeconds <= 6) {
 				color = CivText.WARN;
-				player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+				sound = Sound.BLOCK_NOTE_BLOCK_PLING;
+				pitch = 1.2f;
 			} else {
 				color = CivText.HEADING;
-				player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.8f);
+				sound = Sound.BLOCK_NOTE_BLOCK_BASS;
+				pitch = 0.8f;
+			}
+			if (plugin.getSettings().playLogoutSound(playerId)) {
+				player.playSound(player.getLocation(), sound, 1.0f, pitch);
 			}
 
 			player.showTitle(Title.title(

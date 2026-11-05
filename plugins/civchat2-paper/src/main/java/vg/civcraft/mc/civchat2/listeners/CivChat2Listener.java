@@ -23,7 +23,6 @@ import vg.civcraft.mc.civchat2.CivChat2Manager;
 import vg.civcraft.mc.civchat2.database.CivChatDAO;
 import vg.civcraft.mc.civchat2.event.GlobalChatEvent;
 import vg.civcraft.mc.civchat2.utility.CivChat2SettingsManager;
-import vg.civcraft.mc.civmodcore.ui.Bedrock;
 import vg.civcraft.mc.civmodcore.ui.CivText;
 import vg.civcraft.mc.civmodcore.ui.CivUI;
 import vg.civcraft.mc.namelayer.GroupManager;
@@ -68,7 +67,7 @@ public class CivChat2Listener implements Listener {
                 continue;
             }
             if (settings.getShowLeaves(p.getUniqueId()) && !db.isIgnoringPlayer(p.getUniqueId(), left.getUniqueId())) {
-                p.sendMessage(Bedrock.adapt(p, line));
+                p.sendMessage(chatman.adapt(p, line));
             }
         }
     }
@@ -82,7 +81,7 @@ public class CivChat2Listener implements Listener {
             Component line = presenceLine("+ ", CivText.SUCCESS, joined, " joined the server");
             for (Player p : Bukkit.getOnlinePlayers()) {
                 if (settings.getShowJoins(p.getUniqueId()) && !db.isIgnoringPlayer(p.getUniqueId(), joined.getUniqueId())) {
-                    p.sendMessage(Bedrock.adapt(p, line));
+                    p.sendMessage(chatman.adapt(p, line));
                 }
             }
         }

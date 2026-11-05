@@ -28,6 +28,7 @@ public class CivChat2SettingsManager {
     private BooleanSetting showPrefix;
     private DisplayLocationSetting afkStatusLocation;
     private BooleanSetting showGroupColors;
+    private BooleanSetting showPlayerHeads;
     private BooleanSetting messageSound;
     private EnumSetting<PrivateMessageColor> privateMessageColor;
 
@@ -85,6 +86,10 @@ public class CivChat2SettingsManager {
             "Disabling this setting will make all group colors in chat, gray");
         PlayerSettingAPI.registerSetting(showGroupColors, menu);
 
+        showPlayerHeads = new BooleanSetting(CivChat2.getInstance(), true, "Show player heads in chat", "showPlayerHeads",
+            "Should player faces be shown next to names in chat?");
+        PlayerSettingAPI.registerSetting(showPlayerHeads, menu);
+
         messageSound = new BooleanSetting(CivChat2.getInstance(), true, "Private message sound", "privateMessageSound",
             "Should a sound play when you receive a private message?");
         PlayerSettingAPI.registerSetting(messageSound, menu);
@@ -139,6 +144,10 @@ public class CivChat2SettingsManager {
 
     public boolean showGroupColors(UUID uuid) {
         return showGroupColors.getValue(uuid);
+    }
+
+    public boolean showPlayerHeads(UUID uuid) {
+        return showPlayerHeads.getValue(uuid);
     }
 
     public DisplayLocationSetting getAfkStatusLocation() { return afkStatusLocation; }
