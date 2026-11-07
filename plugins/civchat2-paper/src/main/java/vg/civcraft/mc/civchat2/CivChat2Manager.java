@@ -17,8 +17,11 @@ import java.util.regex.Pattern;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.ObjectComponent;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.object.PlayerHeadObjectContents;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -154,11 +157,9 @@ public class CivChat2Manager {
         Preconditions.checkNotNull(player1, "player1");
         Preconditions.checkNotNull(player2, "player2");
 
-        if (getChannel(player1) != null) {
-            chatChannels.put(player1.getUniqueId(), player2.getUniqueId());
-        } else {
-            chatChannels.put(player1.getUniqueId(), player2.getUniqueId());
-        }
+        // A player is locked into at most one chat target - entering a private chat leaves any group chat.
+        groupChatChannels.remove(player1.getUniqueId());
+        chatChannels.put(player1.getUniqueId(), player2.getUniqueId());
         scoreboardHUD.updateScoreboardHUD(player1);
     }
 
@@ -191,8 +192,8 @@ public class CivChat2Manager {
         replyList.put(receiver.getUniqueId(), sender.getUniqueId());
         replyList.put(sender.getUniqueId(), receiver.getUniqueId());
 
-        sender.sendMessage(Bedrock.adapt(sender, privateLine(sender, CivText.info("You"), receiverName, chatMessage)));
-        receiver.sendMessage(Bedrock.adapt(receiver, privateLine(receiver, senderName, CivText.info("you"), chatMessage)));
+        sender.sendMessage(adapt(sender, privateLine(sender, CivText.info("You"), receiverName, chatMessage)));
+        receiver.sendMessage(adapt(receiver, privateLine(receiver, senderName, CivText.info("you"), chatMessage)));
         if (instance.getCivChat2SettingsManager().getMessageSound(receiver.getUniqueId())) {
             receiver.playSound(MESSAGE_SOUND);
         }
@@ -287,7 +288,7 @@ public class CivChat2Manager {
                             newColor = NamedTextColor.NAMES.valueOrThrow(config.getColorAtDistance(receiverDistance).toLowerCase());
                         }
 
-                        receiver.sendMessage(Bedrock.adapt(receiver, messageFormat.render(sender, identityTag(sender), Component.empty().color(newColor).append(chatMessage), receiver)));
+                        receiver.sendMessage(adapt(receiver, messageFormat.render(sender, identityTag(sender), Component.empty().color(newColor).append(chatMessage), receiver)));
                         receivers.add(receiver.getName());
                     }
                 }
@@ -300,6 +301,7 @@ public class CivChat2Manager {
     /**
      * Rank stars, the player's face, then the name - no brackets. Used by every chat surface and by join/quit lines.
      * A name without a chosen colour is GRAY, so it never inherits the surrounding line's colour.
+     * Send lines carrying it through {@link #adapt} so viewers who turned heads off don't see the face.
      */
     public Component identityTag(Player player) {
         Component name = customNames.containsKey(player.getUniqueId())
@@ -315,6 +317,45 @@ public class CivChat2Manager {
             .hoverEvent(starManager.hover(player));
     }
 
+
+    /**
+     * The line as this viewer should see it: without player heads if they turned them off, then adapted for Bedrock.
+     */
+    public Component adapt(Player viewer, Component message) {
+        Component line = instance.getCivChat2SettingsManager().showPlayerHeads(viewer.getUniqueId())
+            ? message
+            : stripHeads(message);
+        return Bedrock.adapt(viewer, line);
+    }
+
+    /** Removes every player head, and the space that followed it, leaving other sprites alone. */
+    private static Component stripHeads(Component component) {
+        List<Component> children = component.children();
+        if (children.isEmpty()) {
+            return component;
+        }
+        List<Component> result = new ArrayList<>(children.size());
+        boolean changed = false;
+        boolean dropNextSpace = false;
+        for (Component child : children) {
+            if (dropNextSpace) {
+                dropNextSpace = false;
+                if (child instanceof TextComponent text && text.content().equals(" ") && text.children().isEmpty()) {
+                    changed = true;
+                    continue;
+                }
+            }
+            if (child instanceof ObjectComponent object && object.contents() instanceof PlayerHeadObjectContents) {
+                changed = true;
+                dropNextSpace = true;
+                continue;
+            }
+            Component stripped = stripHeads(child);
+            changed |= stripped != child;
+            result.add(stripped);
+        }
+        return changed ? component.children(result) : component;
+    }
 
     /**
      * Flags a message as inappropriate and mutes the sender
@@ -443,6 +484,8 @@ public class CivChat2Manager {
         Preconditions.checkNotNull(player, "player");
         Preconditions.checkNotNull(group, "group");
 
+        // A player is locked into at most one chat target - entering a group chat leaves any private chat.
+        chatChannels.remove(player.getUniqueId());
         groupChatChannels.put(player.getUniqueId(), group);
         scoreboardHUD.updateScoreboardHUD(player);
     }
@@ -570,7 +613,7 @@ public class CivChat2Manager {
                 .append(Component.empty().color(NamedTextColor.WHITE).append(message))
                 .build();
 
-            receiver.sendMessage(Bedrock.adapt(receiver, compMessage));
+            receiver.sendMessage(adapt(receiver, compMessage));
         }
 
         Set<String> players = new HashSet<>();

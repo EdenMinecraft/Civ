@@ -78,6 +78,7 @@ public final class CombatTagPlus extends JavaPlugin {
             getLogger().info("Configuration file has been updated.");
         }
         settings.registerAdminSettings();
+        settings.registerPlayerSettings();
 
         // Disable plugin if version compatibility check fails
         if (!checkVersionCompatibility()) {

@@ -142,6 +142,13 @@ public class ItemUseGUI {
                 if (recipe instanceof ProductionRecipe productionRecipe) {
                     addNamedItems(result, productionRecipe.getOutput());
                 }
+                if (recipe instanceof RandomOutputRecipe randomRecipe) {
+                    for (Map.Entry<ItemMap, Double> entry : randomRecipe.getOutputs().entrySet()) {
+                        if (entry.getValue() != null && entry.getValue() > 0) {
+                            addNamedItems(result, entry.getKey());
+                        }
+                    }
+                }
             }
         }
         return result;
@@ -161,9 +168,12 @@ public class ItemUseGUI {
         }
     }
 
+    private static final Pattern LEGACY_FORMAT_CODES = Pattern.compile("\u00a7[0-9a-fk-orA-FK-OR]");
+
     /** "Player Essence" to "player_essence", so it can be typed as a single command argument */
     public static String toLookupName(String name) {
-        return name.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
+        String stripped = LEGACY_FORMAT_CODES.matcher(name).replaceAll("");
+        return stripped.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
     }
 
     private IClickable getDividerClick() {
