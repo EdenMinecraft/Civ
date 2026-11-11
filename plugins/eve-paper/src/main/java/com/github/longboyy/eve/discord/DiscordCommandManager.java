@@ -35,7 +35,6 @@ public class DiscordCommandManager implements SlashCommandProvider {
         this.plugin = plugin;
         commands.put(RelayDiscordCommand.COMMAND_DATA.getName(), new RelayDiscordCommand(this.plugin));
         commands.put(InviteDiscordCommand.COMMAND_DATA.getName(), new InviteDiscordCommand());
-        //commands.put(RelayConfigDiscordCommand.COMMAND_DATA.getName(), new RelayConfigDiscordCommand());
     }
 
     /**

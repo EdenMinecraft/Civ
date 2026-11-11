@@ -3,11 +3,13 @@ package com.github.longboyy.eve.discord.command.impl;
 import com.github.longboyy.eve.EvePermissionHandler;
 import com.github.longboyy.eve.EvePlugin;
 import com.github.longboyy.eve.discord.command.AuthedDiscordCommand;
+import com.github.longboyy.eve.model.RelayType;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.dependencies.jda.api.Permission;
 import github.scarsz.discordsrv.dependencies.jda.api.events.interaction.SlashCommandEvent;
 import github.scarsz.discordsrv.dependencies.jda.api.interactions.commands.OptionType;
 import github.scarsz.discordsrv.dependencies.jda.api.interactions.commands.build.CommandData;
+import github.scarsz.discordsrv.dependencies.jda.api.interactions.commands.build.OptionData;
 import github.scarsz.discordsrv.dependencies.jda.api.interactions.commands.build.SubcommandData;
 import vg.civcraft.mc.civmodcore.utilities.CivLogger;
 import vg.civcraft.mc.namelayer.GroupManager;
@@ -21,9 +23,19 @@ public class RelayDiscordCommand extends AuthedDiscordCommand {
     public static final CommandData COMMAND_DATA = new CommandData("relay", "Used to managed relays")
         .addSubcommands(
             new SubcommandData("create", "Create a new relay")
-                .addOption(OptionType.STRING, "group_name", "The name of the group to create the relay for", true),
+                .addOption(OptionType.STRING, "group_name", "The name of the group to create the relay for", true)
+                .addOptions(typeOption()),
             new SubcommandData("delete", "Delete an existing relay")
-                .addOption(OptionType.STRING, "group_name", "The name of the group to delete the relay for", true));
+                .addOption(OptionType.STRING, "group_name", "The name of the group to delete the relay for", true)
+                .addOptions(typeOption()));
+
+    private static OptionData typeOption(){
+        OptionData option = new OptionData(OptionType.STRING, "type", "Snitch alerts, or a two-way bridge with the group's chat", true);
+        for(RelayType type : RelayType.values()){
+            option.addChoice(type.displayName(), type.name());
+        }
+        return option;
+    }
 
     private final EvePlugin plugin;
     private final CivLogger logger;
@@ -55,6 +67,7 @@ public class RelayDiscordCommand extends AuthedDiscordCommand {
         }
 
         String groupName = Objects.requireNonNull(event.getOption("group_name")).getAsString();
+        RelayType type = RelayType.fromString(Objects.requireNonNull(event.getOption("type")).getAsString());
         Group group = GroupManager.getGroup(groupName);
         var textChannel = event.getTextChannel();
         if(group == null) {
@@ -72,19 +85,19 @@ public class RelayDiscordCommand extends AuthedDiscordCommand {
                 return;
             }
 
-            if(this.plugin.getRelayManager().createRelay(group.getGroupId(), textChannel.getGuild().getId(), textChannel.getId())){
-                event.getHook().sendMessage("Created a relay for group `" + groupName + "`").queue();
+            if(this.plugin.getRelayManager().createRelay(group.getGroupId(), textChannel.getGuild().getId(), textChannel.getId(), type)){
+                event.getHook().sendMessage("Created a " + type.displayName() + " relay for group `" + groupName + "`").queue();
             }else{
-                event.getHook().sendMessage("Failed to create a relay for group `" + groupName + "` - make sure one doesn't already exist!").queue();
+                event.getHook().sendMessage("Failed to create a " + type.displayName() + " relay for group `" + groupName + "` - make sure one doesn't already exist!").queue();
             }
             return;
         }
 
-        if(this.plugin.getRelayManager().removeRelay(group.getGroupId(), textChannel.getId())){
-            event.getHook().sendMessage("Deleted the relay for group `" + groupName + "` in this channel.").queue();
+        if(this.plugin.getRelayManager().removeRelay(group.getGroupId(), textChannel.getId(), type)){
+            event.getHook().sendMessage("Deleted the " + type.displayName() + " relay for group `" + groupName + "` in this channel.").queue();
             return;
         }
 
-        event.getHook().sendMessage("Failed to delete the relay for group `" + groupName + "` in this channel.").queue();
+        event.getHook().sendMessage("Failed to delete the " + type.displayName() + " relay for group `" + groupName + "` in this channel.").queue();
     }
 }

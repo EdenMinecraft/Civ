@@ -1,6 +1,7 @@
 package com.github.longboyy.eve.database;
 
 import com.github.longboyy.eve.model.Relay;
+import com.github.longboyy.eve.model.RelayType;
 import com.untamedears.jukealert.JukeAlert;
 import org.jetbrains.annotations.Nullable;
 import vg.civcraft.mc.civmodcore.dao.ManagedDatasource;
@@ -16,7 +17,7 @@ import java.util.logging.Level;
 public class EveDAO extends ManagedDAO {
 
     private static final String LOAD_ALL_RELAYS = "SELECT * FROM relays;";
-    private static final String INSERT_NEW_RELAY = "INSERT INTO relays(group_id, guild_id, channel_id) VALUES(?, ?, ?);";
+    private static final String INSERT_NEW_RELAY = "INSERT INTO relays(group_id, guild_id, channel_id, relay_type) VALUES(?, ?, ?, ?);";
     private static final String REMOVE_RELAY = "DELETE FROM relays WHERE id = ?;";
 
     public EveDAO(ManagedDatasource db){
@@ -34,6 +35,10 @@ public class EveDAO extends ManagedDAO {
             config_id INT DEFAULT -1,
             PRIMARY KEY (id));
             """);
+        // Existing relays predate chat relays, so they are all snitch relays.
+        this.db.registerMigration(2, false, """
+            ALTER TABLE relays ADD COLUMN relay_type VARCHAR(16) NOT NULL DEFAULT 'SNITCH';
+            """);
     }
 
     public @Nullable List<Relay> loadRelays(){
@@ -41,16 +46,18 @@ public class EveDAO extends ManagedDAO {
             rs.getInt("group_id"),
             rs.getString("guild_id"),
             rs.getString("channel_id"),
-            rs.getInt("id")
+            rs.getInt("id"),
+            RelayType.fromString(rs.getString("relay_type"))
         ));
     }
 
-    public @Nullable Relay insertRelay(int groupId, String guildId, String channelId){
+    public @Nullable Relay insertRelay(int groupId, String guildId, String channelId, RelayType type){
         return executeInsert(INSERT_NEW_RELAY, stmt -> {
             stmt.setInt(1, groupId);
             stmt.setString(2, guildId);
             stmt.setString(3, channelId);
-        }, rs -> new Relay(groupId, guildId, channelId, rs.getInt(1)));
+            stmt.setString(4, type.name());
+        }, rs -> new Relay(groupId, guildId, channelId, rs.getInt(1), type));
     }
 
     public boolean removeRelay(int id){

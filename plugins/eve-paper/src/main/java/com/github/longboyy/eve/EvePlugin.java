@@ -3,7 +3,9 @@ package com.github.longboyy.eve;
 import com.github.longboyy.eve.command.ForceGuildUpdateCommand;
 import com.github.longboyy.eve.database.EveDAO;
 import com.github.longboyy.eve.discord.DiscordCommandManager;
+import com.github.longboyy.eve.discord.listeners.DiscordChatListener;
 import com.github.longboyy.eve.discord.listeners.DiscordReadyListener;
+import com.github.longboyy.eve.listeners.ChatListener;
 import com.github.longboyy.eve.listeners.SnitchListener;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.dependencies.jda.api.JDA;
@@ -16,6 +18,7 @@ public class EvePlugin extends ACivMod {
     private final DiscordCommandManager discordCommandManager;
     private final RelayManager relayManager;
     private final DiscordReadyListener discordReadyListener;
+    private final DiscordChatListener discordChatListener;
 
     private CommandManager commandManager;
     private EveDAO dao;
@@ -26,6 +29,7 @@ public class EvePlugin extends ACivMod {
         this.discordCommandManager = new DiscordCommandManager(this);
         this.relayManager = new RelayManager(this);
         this.discordReadyListener = new DiscordReadyListener(this);
+        this.discordChatListener = new DiscordChatListener(this);
     }
 
     @Override
@@ -45,11 +49,13 @@ public class EvePlugin extends ACivMod {
         // and keep the ready listener subscribed so DiscordSRV reconnects re-sync them too.
         this.discordCommandManager.registerProvider();
         this.discordReadyListener.register();
+        this.discordChatListener.register();
         JDA jda = DiscordSRV.getPlugin().getJda();
         if(jda != null && jda.getStatus() == JDA.Status.CONNECTED){
             this.setupDiscord();
         }
         this.registerListener(this.snitchListener);
+        this.registerListener(new ChatListener(this));
 
         this.commandManager.registerCommand(new ForceGuildUpdateCommand(this));
     }
@@ -58,6 +64,7 @@ public class EvePlugin extends ACivMod {
     public void onDisable() {
         super.onDisable();
         this.discordReadyListener.unregister();
+        this.discordChatListener.unregister();
         this.discordCommandManager.unregisterProvider();
         HandlerList.unregisterAll(this);
     }
