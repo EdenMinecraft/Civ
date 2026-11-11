@@ -4,4 +4,4 @@ main: com.github.longboyy.eve.EvePlugin
 author: Longboyy
 description: Adds simple snitch and chat relays for discord
 api-version: 26.3
-depend: [DiscordSRV, CivModCore, JukeAlert, NameLayer, ItemExchange]
+depend: [DiscordSRV, CivModCore, CivChat2, JukeAlert, NameLayer, ItemExchange]

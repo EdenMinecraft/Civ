@@ -519,7 +519,7 @@ public class CivChat2Manager {
         return patterns;
     }
 
-    private boolean containsBannedWord(String message) {
+    public boolean containsBannedWord(String message) {
         for (Pattern pattern : bannedWordPatterns.values()) {
             if (pattern.matcher(message).find()) {
                 return true;
