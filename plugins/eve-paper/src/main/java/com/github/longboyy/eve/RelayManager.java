@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -115,10 +116,23 @@ public class RelayManager {
             getCurrentTime(),
             group.getName().replace("`", "'"),
             MarkdownSanitizer.escape(senderName),
-            MarkdownSanitizer.escape(message)
+            escapeForDiscord(message)
         );
 
         relays.forEach(relay -> publishMessageToDiscord(relay.getChannelId(), formatted));
+    }
+
+    /**
+     * Makes player-typed text show in Discord exactly as typed.
+     *
+     * Besides markdown, Discord renders {@code <...>} tags: user/role/channel mentions ({@code <@id>}), custom
+     * emoji ({@code <:name:id>}), timestamps ({@code <t:...>}) and more. A leading backslash makes Discord show a
+     * tag as literal text. Backslashes the player typed are doubled first (MarkdownSanitizer leaves them alone),
+     * otherwise typing {@code \<@id>} would cancel our escape and render the mention.
+     */
+    static String escapeForDiscord(String text){
+        String escaped = MarkdownSanitizer.escape(text.replace("\\", "\\\\"));
+        return escaped.replace("<", "\\<");
     }
 
     public void publishSnitchHit(Player player, Snitch snitch, SnitchHitType hitType){
@@ -244,7 +258,7 @@ public class RelayManager {
             // Player-controlled text (chat, snitch names) must never be able to ping @everyone, roles or users.
             textChannel.sendMessage(message).allowedMentions(EnumSet.noneOf(Message.MentionType.class)).queue();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            plugin.getLogger().warning(String.format("Failed to publish message to Discord channel(%s)", channelId));
         }
     }
 

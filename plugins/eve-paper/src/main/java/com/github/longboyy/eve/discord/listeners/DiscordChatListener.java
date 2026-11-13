@@ -3,9 +3,11 @@ package com.github.longboyy.eve.discord.listeners;
 import com.github.longboyy.eve.EvePlugin;
 import com.github.longboyy.eve.model.Relay;
 import com.github.longboyy.eve.model.RelayType;
+import com.github.longboyy.eve.util.InteractiveChatSanitizer;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.Subscribe;
 import github.scarsz.discordsrv.api.events.DiscordGuildMessageReceivedEvent;
+import github.scarsz.discordsrv.dependencies.emoji.EmojiParser;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.Guild;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.Message;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.User;
@@ -160,6 +162,15 @@ public class DiscordChatListener extends DiscordListener {
         // Display content resolves <@id> mentions to readable names and strips nothing else. Attachments aren't
         // forwarded, so an attachment-only message comes out empty and is skipped.
         String content = message.getContentDisplay().replace('\n', ' ').trim();
+        // Minecraft's font has no glyphs for most emoji, so turn them into shortcodes (e.g. :grinning:), dropping
+        // skin tones, which would otherwise come out as ":thumbsup|type_3:". Emoji newer than DiscordSRV's bundled
+        // emoji list are left as-is.
+        content = EmojiParser.parseToAliases(content, EmojiParser.FitzpatrickAction.REMOVE)
+            // The parser leaves behind invisible emoji variation selectors (e.g. after a heart), which Minecraft
+            // can draw as boxes.
+            .replace("\uFE0F", "").replace("\uFE0E", "");
+        // Pasted InteractiveChat markers would otherwise show other players' shared inventories in-game.
+        content = InteractiveChatSanitizer.neutralize(content);
         if(content.length() > MAX_MESSAGE_LENGTH){
             content = content.substring(0, MAX_MESSAGE_LENGTH - 3) + "...";
         }
