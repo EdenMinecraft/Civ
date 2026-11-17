@@ -30,35 +30,6 @@ public class WarpFruitListener implements Listener {
         warpFruitTracker.quit(player);
     }
 
-    /*
-    @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        WarpFruitTracker warpFruitTracker = Finale.getPlugin().getManager().getWarpFruitTracker();
-        warpFruitTracker.logLocation(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onVehicleMove(VehicleMoveEvent event) {
-        if(event.getVehicle().getPassengers().isEmpty()){
-           return;
-        }
-
-        WarpFruitTracker warpFruitTracker = Finale.getPlugin().getManager().getWarpFruitTracker();
-        Vehicle vehicle = event.getVehicle();
-        vehicle.getPassengers().forEach(passenger -> {
-            if (!(passenger instanceof Player player)) {
-                return;
-            }
-
-            if(!player.isOnline()){
-                return;
-            }
-
-            warpFruitTracker.logLocation(player, player.getLocation().add(0, 1, 0));
-        });
-    }
-     */
-
     private boolean isChorusHolder(Player player) {
         ItemStack mainItem = player.getInventory().getItemInMainHand();
         ItemStack offItem = player.getInventory().getItemInOffHand();
