@@ -8,7 +8,9 @@ import github.scarsz.discordsrv.api.commands.PluginSlashCommand;
 import github.scarsz.discordsrv.api.commands.SlashCommand;
 import github.scarsz.discordsrv.api.commands.SlashCommandProvider;
 import github.scarsz.discordsrv.dependencies.jda.api.JDA;
+import github.scarsz.discordsrv.dependencies.jda.api.events.guild.GuildJoinEvent;
 import github.scarsz.discordsrv.dependencies.jda.api.events.interaction.SlashCommandEvent;
+import github.scarsz.discordsrv.dependencies.jda.api.hooks.ListenerAdapter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +32,20 @@ public class DiscordCommandManager implements SlashCommandProvider {
 
     private boolean providerRegistered = false;
     private boolean staleGlobalsCleared = false;
+
+    /**
+     * DiscordSRV only syncs slash commands at startup and on /discord reload, never when the bot joins a guild,
+     * so a newly joined guild would have no commands until the next restart. This re-syncs on join.
+     */
+    private final ListenerAdapter guildJoinListener = new ListenerAdapter() {
+        @Override
+        public void onGuildJoin(GuildJoinEvent event) {
+            plugin.getLogger().info("Joined Discord guild " + event.getGuild().getName() + ", syncing slash commands");
+            DiscordSRV.api.updateSlashCommands();
+        }
+    };
+    /** The JDA instance {@link #guildJoinListener} is attached to. DiscordSRV makes a new one when it reconnects. */
+    private JDA listenerJda;
 
     public DiscordCommandManager(EvePlugin plugin){
         this.plugin = plugin;
@@ -59,6 +75,7 @@ public class DiscordCommandManager implements SlashCommandProvider {
         }
         DiscordSRV.api.removeSlashCommandProvider(this);
         providerRegistered = false;
+        detachGuildJoinListener();
     }
 
     /**
@@ -66,8 +83,26 @@ public class DiscordCommandManager implements SlashCommandProvider {
      */
     public void registerCommands(){
         registerProvider();
+        attachGuildJoinListener();
         clearStaleGlobalCommands();
         DiscordSRV.api.updateSlashCommands();
+    }
+
+    private void attachGuildJoinListener(){
+        JDA jda = DiscordSRV.getPlugin().getJda();
+        if(jda == null || jda == listenerJda){
+            return;
+        }
+        detachGuildJoinListener();
+        jda.addEventListener(guildJoinListener);
+        listenerJda = jda;
+    }
+
+    private void detachGuildJoinListener(){
+        if(listenerJda != null){
+            listenerJda.removeEventListener(guildJoinListener);
+            listenerJda = null;
+        }
     }
 
     /**
